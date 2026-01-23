@@ -93,8 +93,9 @@ from .i18n import _
 DEFAULT_CONFIRMED_ONLY = False
 
 def relayfee(network):
-    RELAY_FEE = 5000
-    MAX_RELAY_FEE = 50000
+    # Radiant Core 2.0 minimum: 10,000,000 sat/kB
+    RELAY_FEE = 10000000
+    MAX_RELAY_FEE = 100000000
     f = network.relay_fee if network and network.relay_fee else RELAY_FEE
     return min(f, MAX_RELAY_FEE)
 
