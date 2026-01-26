@@ -1,18 +1,4 @@
-Electron Radiant Release Notes
-==============================
-
-Version 0.1.4 (January 2026)
-----------------------------
-- Updated bitcoin.py with improved transaction handling
-- Updated wallet.py with enhanced wallet functionality
-- Compatibility improvements for Radiant blockchain
-
-For more information, visit: https://github.com/Radiant-Core/Electron-Wallet
-
-
-About
------
-Electron Radiant is a fork of the open source Electron-Cash Bitcoin Cash Wallet and Electrum Bitcoin wallet (www.electrum.org) for Radiant (RXD) Blockchain. The current
+Electron Radiant is a fork of the open source Electron-Cash Bitcoin Cash Wallet and Electrum Bitcoin wallet (www.electrum.org) for Radiant (RADN) Blockchain. The current
 release is based on the Electrum 2.9.0 codebase with patches to
 
 - handle Bitcoin Cash difficulty adjustment algorithm
