@@ -23,6 +23,8 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 import codecs
+import importlib
+import importlib.util
 import json
 import os
 import pkgutil
@@ -75,6 +77,7 @@ class Plugins(DaemonThread):
         DaemonThread.__init__(self)
         internal_plugins_namespace = __import__('electroncash_plugins')
         self.internal_plugins_pkgpath = os.path.dirname(internal_plugins_namespace.__file__)
+        self.internal_plugins_pkgname = internal_plugins_namespace.__name__
         self.config = config
         self.gui_name = gui_name
         self.hw_wallets = {}
@@ -135,7 +138,7 @@ class Plugins(DaemonThread):
             # do not load deprecated plugins
             if name in ['plot', 'exchange_rate']:
                 continue
-            m = loader.find_module(name).load_module(name)
+            m = importlib.import_module(f'{self.internal_plugins_pkgname}.{name}')
             d = m.__dict__
             if not self.register_plugin(name, d):
                 continue
@@ -209,11 +212,11 @@ class Plugins(DaemonThread):
             return self.internal_plugins[name]
 
         full_name = 'electroncash_plugins.' + name + '.' + self.gui_name
-        loader = pkgutil.find_loader(full_name)
-        if not loader:
+        try:
+            p = importlib.import_module(full_name)
+        except ModuleNotFoundError:
             raise RuntimeError("%s implementation for %s plugin not found"
                                % (self.gui_name, name))
-        p = loader.load_module(full_name)
         plugin = p.Plugin(self, self.config, name)
         plugin.set_enabled_prefix(INTERNAL_USE_PREFIX)
         self.add_jobs(plugin.thread_jobs())
@@ -239,19 +242,24 @@ class Plugins(DaemonThread):
             return
 
         try:
-            module = zipfile.load_module(name)
-        except zipimport.ZipImportError as e:
+            spec = zipfile.find_spec(name)
+            if spec is None:
+                raise zipimport.ZipImportError("no spec found")
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
+            spec.loader.exec_module(module)
+        except (zipimport.ZipImportError, Exception) as e:
             self.print_error("unable to load zip plugin '%s' package '%s'" % (plugin_file_path, name), str(e))
             return
 
         sys.modules['electroncash_external_plugins.'+ name] = module
 
         full_name = 'electroncash_external_plugins.' + name + '.' + self.gui_name
-        loader = pkgutil.find_loader(full_name)
-        if not loader:
+        try:
+            p = importlib.import_module(full_name)
+        except ModuleNotFoundError:
             raise RuntimeError("%s implementation for %s plugin not found"
                                % (self.gui_name, name))
-        p = loader.load_module(full_name)
         plugin = p.Plugin(self, self.config, name)
         plugin.set_enabled_prefix(EXTERNAL_USE_PREFIX)
         self.add_jobs(plugin.thread_jobs())

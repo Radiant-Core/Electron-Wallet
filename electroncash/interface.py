@@ -86,17 +86,32 @@ class TcpConnection(threading.Thread, util.PrintError):
         return self.host
 
     def check_host_name(self, peercert, name) -> bool:
-        """Wrapper for ssl.match_hostname that never throws. Returns True if the
-        certificate matches, False otherwise. Supports whatever wildcard certs
-        and other bells and whistles supported by ssl.match_hostname."""
-        # Check that the peer has supplied a certificate.
-        # None/{} is not acceptable.
+        """Checks that the certificate matches the hostname. Returns True if
+        the certificate matches, False otherwise."""
         if not peercert:
             return False
         try:
-            ssl.match_hostname(peercert, name)
+            # ssl.match_hostname was removed in Python 3.12;
+            # hostname verification is now handled by SSLContext.check_hostname.
+            # We still do a manual check as a fallback for pinned certs.
+            from ssl import CertificateError
+            try:
+                ssl.match_hostname(peercert, name)
+            except AttributeError:
+                # Python 3.12+: match_hostname removed, use our own check
+                san = peercert.get('subjectAltName', ())
+                dns_names = [v for k, v in san if k == 'DNS']
+                if not dns_names:
+                    # Fall back to commonName
+                    for sub in peercert.get('subject', ()):
+                        for k, v in sub:
+                            if k == 'commonName':
+                                dns_names.append(v)
+                if not any(_match_hostname(name, pat) for pat in dns_names):
+                    raise CertificateError(
+                        "hostname %r doesn't match any of %r" % (name, dns_names))
             return True
-        except ssl.CertificateError as e:
+        except (ssl.CertificateError, CertificateError) as e:
             self.print_error("SSL certificate hostname mismatch:", str(e))
         return False
 

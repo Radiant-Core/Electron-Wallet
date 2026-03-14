@@ -1,3 +1,13 @@
+# Release 0.1.6
+  * Python 3.12+ compatibility: fixed ssl.match_hostname removal in interface.py
+  * Python 3.12+ compatibility: replaced deprecated pkgutil/loader APIs in plugins.py
+  * Python 3.12+ compatibility: replaced deprecated imp module in setup.py
+  * Updated servers.json with live ElectrumX servers (4 dead servers replaced)
+  * Glyph token awareness: wallet now detects Radiant reference-prefixed UTXOs
+  * Glyph token protection: reference UTXOs excluded from coin selection to
+    prevent accidental token destruction
+  * Build: removed pinned package versions from Wine Dockerfile
+
 # Release 0.1.5
   * Critical DAA hard fork compatibility fix for Radiant Core 2.0
   * Updated ASERT difficulty validation to support half-life upgrade at block 410,000

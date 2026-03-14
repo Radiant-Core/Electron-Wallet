@@ -74,6 +74,7 @@ from . import paymentrequest
 from .paymentrequest import InvoiceStore, PR_PAID, PR_UNCONFIRMED, PR_UNPAID, PR_UNKNOWN, PR_EXPIRED
 from .contacts import Contacts
 from . import cashacct
+from . import glyph
 from . import lns
 from . import slp
 from .rpa import paycode as rpa
@@ -204,8 +205,10 @@ class Abstract_Wallet(PrintError, SPVDelegate):
         self.cashacct = cashacct.CashAcct(self)
         self.lns = None
         self.slp = slp.WalletData(self)
+        self.glyph = glyph.WalletData(self)
         finalization_print_error(self.cashacct)  # debug object lifecycle
         finalization_print_error(self.slp)  # debug object lifecycle
+        finalization_print_error(self.glyph)  # debug object lifecycle
         if self.lns:
             finalization_print_error(self.lns)  # debug object lifecycle
 
@@ -291,6 +294,7 @@ class Abstract_Wallet(PrintError, SPVDelegate):
         # data here, before the below calls happen
         self.cashacct.load()
         self.slp.load()  # try to load first so we can pick up the remove_transaction hook from load_transactions if need be
+        self.glyph.load()
         if self.lns:
             self.lns.load()
 
@@ -306,6 +310,10 @@ class Abstract_Wallet(PrintError, SPVDelegate):
             # load failed, must rebuild from self.transactions
             self.slp.rebuild()
             self.slp.save()  # commit changes to self.storage
+
+        if self.glyph.need_rebuild:
+            self.glyph.rebuild()
+            self.glyph.save()
 
         # Print debug message on finalization
         finalization_print_error(self, "[{}/{}] finalized".format(type(self).__name__, self.diagnostic_name()))
@@ -423,6 +431,7 @@ class Abstract_Wallet(PrintError, SPVDelegate):
                 self.transactions.pop(tx_hash)
                 self.cashacct.remove_transaction_hook(tx_hash)
                 self.slp.rm_tx(tx_hash)
+                self.glyph.rm_tx(tx_hash)
 
     @profiler
     def save_transactions(self, write=False):
@@ -446,6 +455,7 @@ class Abstract_Wallet(PrintError, SPVDelegate):
             history = self.from_Address_dict(self._history)
             self.storage.put('addr_history', history)
             self.slp.save()
+            self.glyph.save()
             if write:
                 self.storage.write()
 
@@ -471,6 +481,7 @@ class Abstract_Wallet(PrintError, SPVDelegate):
             self.pruned_txo = {}
             self.pruned_txo_values = set()
             self.slp.clear()
+            self.glyph.clear()
             self.save_transactions()
             self._addr_bal_cache = {}
             self._history = {}
@@ -972,6 +983,7 @@ class Abstract_Wallet(PrintError, SPVDelegate):
                 'coinbase':is_cb,
                 'is_frozen_coin':txo in self.frozen_coins or txo in self.frozen_coins_tmp,
                 'slp_token':self.slp.token_info_for_txo(txo),  # (token_id_hex, qty) tuple or None
+                'glyph_token':self.glyph.is_glyph_ref(txo),  # True if this UTXO carries a Glyph token reference
             }
             out[txo] = x
         return out
@@ -1051,15 +1063,18 @@ class Abstract_Wallet(PrintError, SPVDelegate):
         confirmed_only = config.get('confirmed_only', DEFAULT_CONFIRMED_ONLY)
         if (isInvoice):
             confirmed_only = True
-        return self.get_utxos(domain, exclude_frozen=True, mature=True, confirmed_only=confirmed_only, exclude_slp=True)
+        return self.get_utxos(domain, exclude_frozen=True, mature=True, confirmed_only=confirmed_only, exclude_slp=True, exclude_glyph=True)
 
     def get_utxos(self, domain = None, exclude_frozen = False, mature = False, confirmed_only = False,
-                  *, addr_set_out = None, exclude_slp = True):
+                  *, addr_set_out = None, exclude_slp = True, exclude_glyph = True):
         '''Note that exclude_frozen = True checks for BOTH address-level and
         coin-level frozen status.
 
         exclude_slp skips coins that also have SLP tokens on them.  This defaults
         to True in EC 4.0.10+ in order to prevent inadvertently burning tokens.
+
+        exclude_glyph skips coins that carry Radiant Glyph token references.
+        This defaults to True to prevent inadvertently destroying tokens.
 
         Optional kw-only arg `addr_set_out` specifies a set in which to add all
         addresses encountered in the utxos returned. '''
@@ -1075,6 +1090,8 @@ class Abstract_Wallet(PrintError, SPVDelegate):
                 len_before = len(coins)
                 for x in utxos.values():
                     if exclude_slp and x['slp_token']:
+                        continue
+                    if exclude_glyph and x.get('glyph_token'):
                         continue
                     if exclude_frozen and x['is_frozen_coin']:
                         continue
@@ -1427,6 +1444,9 @@ class Abstract_Wallet(PrintError, SPVDelegate):
             # cheap no-op if this tx's outputs[0] is not an SLP script.
             self.slp.add_tx(tx_hash, tx)
 
+            # Scan for Glyph reference outputs to protect them from spending
+            self.glyph.add_tx(tx_hash, tx)
+
     def remove_transaction(self, tx_hash):
         with self.lock:
             self.print_error("removing tx from history", tx_hash)
@@ -1469,6 +1489,8 @@ class Abstract_Wallet(PrintError, SPVDelegate):
             self.cashacct.remove_transaction_hook(tx_hash)
             # inform slp subsystem as well
             self.slp.rm_tx(tx_hash)
+            # inform glyph subsystem as well
+            self.glyph.rm_tx(tx_hash)
 
     def receive_tx_callback(self, tx_hash, tx, tx_height):
         self.add_transaction(tx_hash, tx)

@@ -66,6 +66,8 @@ class ASERTDaa:
 
     IDEAL_BLOCK_TIME = 5 * 60  # 5 mins
     HALF_LIFE = 2 * 24 * 3600  # for mainnet, testnet has 3600 (1 hour) half-life
+    HALF_LIFE_V2 = 12 * 60 * 60  # 12 hours, activated at ASERT_HALF_LIFE_UPGRADE_HEIGHT
+    ASERT_HALF_LIFE_UPGRADE_HEIGHT = 410000  # Radiant Core 2.0 hard fork height
     # Integer implementation uses these for fixed point math
     RBITS = 16  # number of bits after the radix for fixed-point math
     RADIX = 1 << RBITS
@@ -76,6 +78,8 @@ class ASERTDaa:
 
     # If left as none, blockchain.py will calculate this at runtime as we read headers.
     anchor: Optional[Anchor] = None
+    # V2 anchor at block 409999 (one block before upgrade height)
+    anchor_v2: Optional[Anchor] = None
 
     def __init__(self, is_testnet=False):
         if is_testnet:
@@ -114,7 +118,7 @@ class ASERTDaa:
         h = hex(target)[2:]
         return '0' * (64 - len(h)) + h
 
-    def next_bits_aserti3_2d(self, anchor_bits: int, time_diff: Union[float, int], height_diff: int) -> int:
+    def next_bits_aserti3_2d(self, anchor_bits: int, time_diff: Union[float, int], height_diff: int, half_life: Optional[int] = None) -> int:
         """ Integer ASERTI algorithm, based on Jonathan Toomim's
         `next_bits_aserti` implementation in mining.py (see
         https://github.com/jtoomim/difficulty) """
@@ -131,7 +135,8 @@ class ASERTDaa:
         # uses a 64-bit signed integer for the exponent. If inputs violate that,
         # then the implementation will diverge.
         assert(abs(time_diff - self.IDEAL_BLOCK_TIME * (height_diff+1)) < (1<<(63-self.RBITS)))
-        exponent = int(((time_diff - self.IDEAL_BLOCK_TIME*(height_diff+1)) * self.RADIX) / self.HALF_LIFE)
+        hl = half_life if half_life is not None else self.HALF_LIFE
+        exponent = int(((time_diff - self.IDEAL_BLOCK_TIME*(height_diff+1)) * self.RADIX) / hl)
 
         # Next, we use the 2^x = 2 * 2^(x-1) identity to shift our exponent into the (0, 1] interval.
         shifts = exponent >> self.RBITS

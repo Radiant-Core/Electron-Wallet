@@ -79,6 +79,9 @@ class MainNet(AbstractNet):
     # blockchain.py skips headers after the checkpoint.  So all instances that have a checkpoint
     # after the anchor must specify the anchor as well.
     asert_daa.anchor = Anchor(height=18206, bits=453224288, prev_time=1657404650)
+    # V2 anchor: block 409999 (one before ASERT_HALF_LIFE_UPGRADE_HEIGHT=410000)
+    # bits=0x1a008d39, prev_time=1773088826 (timestamp of block 409998)
+    asert_daa.anchor_v2 = Anchor(height=409999, bits=0x1a008d39, prev_time=1773088826)
 
     # Version numbers for BIP32 extended keys
     # standard: xprv, xpub

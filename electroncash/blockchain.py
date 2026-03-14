@@ -527,12 +527,23 @@ class Blockchain(util.PrintError):
                 if header_ts - prev_ts > 20*60:
                     return MAX_BITS
 
-            anchor = self.get_asert_anchor(prior, daa_mtp, chunk)
-            assert anchor is not None, "Failed to find ASERT anchor block for chain {!r}".format(self)
+            # Check if we are at or past the ASERT half-life upgrade height
+            upgrade_height = networks.net.asert_daa.ASERT_HALF_LIFE_UPGRADE_HEIGHT
+            if height >= upgrade_height and networks.net.asert_daa.anchor_v2 is not None:
+                # Use V2 anchor (block 409999) and 12-hour half-life
+                anchor = networks.net.asert_daa.anchor_v2
+                return networks.net.asert_daa.next_bits_aserti3_2d(anchor.bits,
+                                                                   prev_ts - anchor.prev_time,
+                                                                   prevheight - anchor.height,
+                                                                   half_life=networks.net.asert_daa.HALF_LIFE_V2)
+            else:
+                # Pre-upgrade: use original anchor and 2-day half-life
+                anchor = self.get_asert_anchor(prior, daa_mtp, chunk)
+                assert anchor is not None, "Failed to find ASERT anchor block for chain {!r}".format(self)
 
-            return networks.net.asert_daa.next_bits_aserti3_2d(anchor.bits,
-                                                               prev_ts - anchor.prev_time,
-                                                               prevheight - anchor.height)
+                return networks.net.asert_daa.next_bits_aserti3_2d(anchor.bits,
+                                                                   prev_ts - anchor.prev_time,
+                                                                   prevheight - anchor.height)
 
         N_BLOCKS = networks.net.LEGACY_POW_RETARGET_BLOCKS  # Normally 2016
         if height % N_BLOCKS == 0:

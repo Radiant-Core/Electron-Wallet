@@ -7,7 +7,7 @@ import setuptools.command.sdist
 import os
 import sys
 import platform
-import imp
+import importlib.util
 import argparse
 
 with open('contrib/requirements/requirements.txt') as f:
@@ -22,7 +22,9 @@ with open('contrib/requirements/requirements-binaries.txt') as f:
 with open('contrib/requirements/requirements-web3.txt') as f:
     requirements_web3 = f.read().splitlines()
 
-version = imp.load_source('version', 'electroncash/version.py')
+_spec = importlib.util.spec_from_file_location('version', 'electroncash/version.py')
+version = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(version)
 
 if sys.version_info[:3] < (3, 6):
     sys.exit("Error: Electron Radiant requires Python version >= 3.6...")

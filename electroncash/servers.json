@@ -1,23 +1,23 @@
 {
-    "electrumx.radiantexplorer.com": {
+    "electrumx2.radiant4people.com": {
         "pruning": "-",
         "s": "50012",
         "t": "50010",
         "version": "1.4"
     },
-    "electrumx2.radiantexplorer.com": {
+    "radiantus.bladenet.online": {
         "pruning": "-",
         "s": "50012",
         "t": "50010",
         "version": "1.4"
     },
-    "electrumx.radiant.ovh": {
+    "radiant2.bladenet.online": {
         "pruning": "-",
         "s": "50012",
         "t": "50010",
         "version": "1.4"
     },
-    "electrumx.radiantblockchain.org": {
+    "radiant4.bladenet.online": {
         "pruning": "-",
         "s": "50012",
         "t": "50010",

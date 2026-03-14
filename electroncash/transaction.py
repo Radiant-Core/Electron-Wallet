@@ -34,6 +34,7 @@ from .bitcoin import *
 from .address import (PublicKey, Address, Script, ScriptOutput, hash160,
                       UnknownAddress, OpCodes as opcodes,
                       P2PKH_prefix, P2PKH_suffix, P2SH_prefix, P2SH_suffix)
+from . import glyph as glyph_mod
 from . import schnorr
 from . import util
 import struct
@@ -293,6 +294,21 @@ def get_address_from_output_script(_bytes):
 
     # note: we don't recognize bare multisigs.
 
+    # Check for Radiant reference-prefixed scripts (Glyph tokens).
+    # These have OP_PUSHINPUTREF/OP_REQUIREINPUTREF opcodes prepended to
+    # a standard locking script. Strip the references and try to extract
+    # the inner address so the wallet can track these UTXOs.
+    if glyph_mod.has_radiant_refs(_bytes):
+        inner = glyph_mod.strip_radiant_refs(_bytes)
+        if inner is not None:
+            inner_len = len(inner)
+            if (inner_len == 25 and inner.startswith(P2PKH_prefix)
+                    and inner.endswith(P2PKH_suffix)):
+                return TYPE_ADDRESS, Address.from_P2PKH_hash(inner[3:23])
+            if (inner_len == 23 and inner.startswith(P2SH_prefix)
+                    and inner.endswith(P2SH_suffix)):
+                return TYPE_ADDRESS, Address.from_P2SH_hash(inner[2:22])
+
     return TYPE_SCRIPT, ScriptOutput.protocol_factory(bytes(_bytes))
 
 
@@ -392,6 +408,7 @@ class Transaction:
             raise BaseException("cannot initialize transaction", raw)
         self._inputs = None
         self._outputs = None
+        self._output_scripts = None
         self.locktime = 0
         self.version = 1
         self._sign_schnorr = sign_schnorr
@@ -438,6 +455,16 @@ class Transaction:
         if self._outputs is None:
             self.deserialize()
         return self._outputs
+
+    def output_script(self, index):
+        """Return the raw scriptPubKey bytes for output at `index`,
+        or None if unavailable."""
+        if self._output_scripts is None:
+            self.deserialize()
+        if (self._output_scripts is not None
+                and 0 <= index < len(self._output_scripts)):
+            return self._output_scripts[index]
+        return None
 
     @classmethod
     def get_sorted_pubkeys(self, txin):
@@ -524,6 +551,7 @@ class Transaction:
         self.invalidate_common_sighash_cache()
         self._inputs = d['inputs']
         self._outputs = [(x['type'], x['address'], x['value']) for x in d['outputs']]
+        self._output_scripts = [bytes.fromhex(x['scriptPubKey']) for x in d['outputs']]
         assert all(isinstance(output[1], (PublicKey, Address, ScriptOutput))
                    for output in self._outputs)
         self.locktime = d['lockTime']
