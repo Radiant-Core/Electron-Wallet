@@ -12,8 +12,10 @@ PYDIR="$APPDIR"/usr/lib/python3.8
 
 export GCC_STRIP_BINARIES="1"
 export GIT_SUBMODULE_FLAGS="--recommend-shallow --depth 1"
+export GIT_SUBMODULE_SKIP=1
 
 . "$CONTRIB"/base.sh
+unset GIT_SUBMODULE_SKIP
 
 # pinned versions
 SQUASHFSKIT_COMMIT="ae0d656efa2d0df2fcac795b6823b44462f19386"
@@ -38,7 +40,10 @@ verify_hash "$CACHEDIR/Python-$PYTHON_VERSION.tar.xz" $PYTHON_SRC_TARBALL_HASH
 
 (
     cd "$PROJECT_ROOT"
-    for pkg in secp zbar openssl libevent zlib tor ; do
+    # Remove OpenSSL directory to prevent Tor from finding stale headers
+    rm -rf "$CONTRIB"/openssl/dist
+    # Skip custom OpenSSL build and use system OpenSSL
+    for pkg in secp zbar libevent zlib tor ; do
         "$CONTRIB"/make_$pkg || fail "Could not build $pkg"
     done
 )
@@ -112,8 +117,8 @@ mkdir -p "$CACHEDIR/pip_cache"
 # Note: We must specify -g0 for CFLAGS to ensure no debug symbols (which can be non-deterministic due to tmp paths
 # encoded in the debug symbols).
 CFLAGS="-g0" "$python" -m pip install --no-deps --no-warn-script-location --no-binary :all: --cache-dir "$CACHEDIR/pip_cache" -r "$CONTRIB/deterministic-build/requirements-pip.txt"
-CFLAGS="-g0" "$python" -m pip install --no-deps --no-warn-script-location --no-binary :all: --cache-dir "$CACHEDIR/pip_cache" -r "$CONTRIB/deterministic-build/requirements.txt"
-CFLAGS="-g0" "$python" -m pip install --no-deps --no-warn-script-location --no-binary :all: --only-binary pyqt5 --cache-dir "$CACHEDIR/pip_cache" -r "$CONTRIB/deterministic-build/requirements-binaries.txt"
+CFLAGS="-g0" "$python" -m pip install --no-deps --no-warn-script-location --no-binary :all: --only-binary dnspython --cache-dir "$CACHEDIR/pip_cache" -r "$CONTRIB/deterministic-build/requirements.txt"
+CFLAGS="-g0" "$python" -m pip install --no-deps --no-warn-script-location --no-binary :all: --only-binary pyqt5,PyQt5-Qt5,PyQt5-sip,cryptography --cache-dir "$CACHEDIR/pip_cache" -r "$CONTRIB/deterministic-build/requirements-binaries.txt"
 CFLAGS="-g0" "$python" -m pip install --no-deps --no-warn-script-location --no-binary :all: --cache-dir "$CACHEDIR/pip_cache" -r "$CONTRIB/deterministic-build/requirements-hw.txt"
 # Note: Too many of these web3 packages fail to build if using --no-binary, so disabled for web3
 CFLAGS="-g0" "$python" -m pip install --no-deps --no-warn-script-location --cache-dir "$CACHEDIR/pip_cache" -r "$CONTRIB/deterministic-build/requirements-web3.txt"

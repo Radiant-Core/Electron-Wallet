@@ -9,12 +9,9 @@ PYPKG='electroncash'
 MAIN_SCRIPT='electron-radiant'
 ICONS_FILE='electron.icns'
 
-for i, x in enumerate(sys.argv):
-    if x == '--name':
-        VERSION = sys.argv[i+1]
-        break
-else:
-    raise BaseException('no version')
+VERSION = os.environ.get('EC_PACKAGE_VERSION')
+if not VERSION:
+    raise BaseException('EC_PACKAGE_VERSION not set')
 
 home = os.path.abspath(".") + "/"
 block_cipher = None

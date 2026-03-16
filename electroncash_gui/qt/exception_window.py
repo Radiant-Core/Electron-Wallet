@@ -80,7 +80,7 @@ class Exception_Window(QWidget):
         l.setWordWrap(True)
         main_box.addWidget(l)
 
-        l = QLabel(_('Please report the problem on <a href="https://github.com/RadiantBlockchain/electron-radiant/issues">GitHub</a>.'))
+        l = QLabel(_('Please report the problem on <a href="https://github.com/Radiant-Core/Electron-Wallet/issues">GitHub</a>.'))
         l.setWordWrap(True)
         l.setOpenExternalLinks(True)
         main_box.addWidget(l)

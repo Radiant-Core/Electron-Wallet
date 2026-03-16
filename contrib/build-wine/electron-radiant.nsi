@@ -9,7 +9,7 @@
 
   !define PRODUCT_NAME "Electron Radiant"
   !define INTERNAL_NAME "Electron-Radiant"
-  !define PRODUCT_WEB_SITE "https://github.com/RadiantBlockchain/electron-radiant"
+  !define PRODUCT_WEB_SITE "https://github.com/Radiant-Core/Electron-Wallet"
   !define PRODUCT_PUBLISHER ""
   !define INSTDIR_REG_ROOT "HKCU"
   !define INSTDIR_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"

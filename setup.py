@@ -205,6 +205,6 @@ setup(
     author="",
     author_email="",
     license="MIT Licence",
-    url="https://github.com/RadiantBlockchain/electron-radiant",
+    url="https://github.com/Radiant-Core/Electron-Wallet",
     long_description="""Lightweight Radiant Wallet"""
 )

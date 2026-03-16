@@ -81,21 +81,42 @@ if crowdin_api_key:
     response = requests.request('GET', 'https://api.crowdin.com/api/project/' + crowdin_identifier + '/export?key=' + crowdin_api_key)
     print("", "export:", "-" * 20, response.text, "-" * 20, sep="\n")
 
-if len(sys.argv) < 2:
-    # Download & unzip
+local_locale_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'electrum-locale', 'locale')
+
+if os.path.isdir(local_locale_dir):
+    print('Using local locale directory:', local_locale_dir)
+    for lang in os.listdir(local_locale_dir):
+        src_dir = os.path.join(local_locale_dir, lang)
+        dst_dir = os.path.join('locale', lang)
+        dst_msg_dir = os.path.join(dst_dir, 'LC_MESSAGES')
+        if not isdir(src_dir) or lang == "__pycache__":
+            continue
+        if not os.path.exists(dst_msg_dir):
+            os.makedirs(dst_msg_dir, exist_ok=True)
+        src_po = os.path.join(src_dir, 'electron-cash.po')
+        dst_po = os.path.join(dst_msg_dir, 'electron-cash.po')
+        if os.path.exists(src_po):
+            with open(src_po, 'rb') as src, open(dst_po, 'wb') as dst:
+                dst.write(src.read())
+    # Skip Crowdin download since we used local locale
+    zfobj = None
+elif len(sys.argv) < 2:
     s = requests.request('GET', 'https://crowdin.com/backend/download/project/' + crowdin_identifier + '.zip').content
+    if not zipfile.is_zipfile(io.BytesIO(s)):
+        raise RuntimeError('Failed to download translations zip from Crowdin and local contrib/electrum-locale/locale was not found')
     zfobj = zipfile.ZipFile(io.BytesIO(s))
 else:
     zfobj = zipfile.ZipFile(os.path.join(os.path.relpath(original_dir, os.getcwd()), sys.argv[1]))
 
-print('Unzip translations')
-for name in zfobj.namelist():
-    if name.endswith('/'):
-        if not os.path.exists(name):
-            os.mkdir(name)
-    else:
-        with open(name, 'wb') as output:
-            output.write(zfobj.read(name))
+if 'zfobj' in locals():
+    print('Unzip translations')
+    for name in zfobj.namelist():
+        if name.endswith('/'):
+            if not os.path.exists(name):
+                os.mkdir(name)
+        else:
+            with open(name, 'wb') as output:
+                output.write(zfobj.read(name))
 
 # Convert .po to .mo
 print('Installing')

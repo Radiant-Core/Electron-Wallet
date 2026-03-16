@@ -194,13 +194,25 @@ export PYTHONHASHSEED=22
 export SOURCE_DATE_EPOCH=1530212462
 # Note, when upgrading Python, check the Windows python.exe embedded manifest for changes.
 # If the manifest changed, contrib/build-wine/manifest.xml needs to be updated.
-export PYTHON_VERSION=3.8.9  # Windows, OSX & Linux AppImage use this to determine what to download/build
-export PYTHON_SRC_TARBALL_HASH="5e391f3ec45da2954419cab0beaefd8be38895ea5ce33577c3ec14940c4b9572"  # If you change PYTHON_VERSION above, update this by downloading the tarball manually and doing a sha256sum on it.
-export DEFAULT_GIT_REPO=https://github.com/RadiantBlockchain/electron-radiant
+export PYTHON_VERSION=3.8.20  # Windows, OSX & Linux AppImage use this to determine what to download/build
+export PYTHON_SRC_TARBALL_HASH="6fb89a7124201c61125c0ab4cf7f6894df339a40c02833bfd28ab4d7691fafb4"  # If you change PYTHON_VERSION above, update this by downloading the tarball manually and doing a sha256sum on it.
+export DEFAULT_GIT_REPO="$(git config --get remote.origin.url || true)"
+if [ -n "$DEFAULT_GIT_REPO" ]; then
+    case "$DEFAULT_GIT_REPO" in
+        git@github.com:*)
+            export DEFAULT_GIT_REPO="https://github.com/${DEFAULT_GIT_REPO#git@github.com:}"
+            ;;
+        ssh://git@github.com/*)
+            export DEFAULT_GIT_REPO="https://github.com/${DEFAULT_GIT_REPO#ssh://git@github.com/}"
+            ;;
+    esac
+fi
+if [ -z "$DEFAULT_GIT_REPO" ] ; then
+    export DEFAULT_GIT_REPO=https://github.com/Radiant-Core/Electron-Wallet.git
+fi
 if [ -z "$GIT_REPO" ] ; then
-    # If no override from env is present, use default. Support for overrides
-    # for the GIT_REPO has been added to allows contributors to test containers
-    # that are on local filesystem (while devving) or are their own github forks
+    # If no override from env is present, use the current repository's origin.
+    # Support for overrides for GIT_REPO remains for local filesystem paths or forks.
     export GIT_REPO="$DEFAULT_GIT_REPO"
 fi
 if [ "$GIT_REPO" != "$DEFAULT_GIT_REPO" ]; then
@@ -209,7 +221,7 @@ if [ "$GIT_REPO" != "$DEFAULT_GIT_REPO" ]; then
     # print this message if it turns out to just be the default.
     info "Picked up override from env: GIT_REPO=${GIT_REPO}"
 fi
-export GIT_DIR_NAME=`basename $GIT_REPO`
+export GIT_DIR_NAME="$(basename "$GIT_REPO" .git)"
 export PACKAGE="Electron-Radiant"  # Modify this if you like -- Windows, MacOS & Linux srcdist build scripts read this, while AppImage has it hard-coded
 export PYI_SKIP_TAG="${PYI_SKIP_TAG:-0}" # Set this to non-zero to make PyInstaller skip tagging the bootloader
 export DEFAULT_UBUNTU_MIRROR="http://archive.ubuntu.com/ubuntu/"
@@ -273,7 +285,7 @@ if [ "${GIT_SUBMODULE_SKIP:-0}" -eq 0 ] ; then
         # See https://public-inbox.org/git/20191013064314.GA28018@sigill.intra.peff.net/
         gitflags="-c protocol.version=2"
     fi
-    git $gitflags submodule update --init --jobs 0 $GIT_SUBMODULE_FLAGS || fail "Failed to update git submodules"
+    git $gitflags submodule update --init --jobs "${WORKER_COUNT:-4}" $GIT_SUBMODULE_FLAGS || fail "Failed to update git submodules"
 fi
 
 # This variable is set to avoid sourcing base.sh multiple times

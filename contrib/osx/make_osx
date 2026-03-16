@@ -52,7 +52,7 @@ LIBSECP_COMMIT="69ccf0d2f758b1a4df9cde8222459381e08fc1dc"
 MAJ_MIN=(${PYTHON_VERSION//./ })
 MAJ_MIN=${MAJ_MIN[0]}.${MAJ_MIN[1]}
 
-which xcodebuild > /dev/null 2>&1 || fail "Please install Xcode and xcode command line tools to continue"
+which xcodebuild > /dev/null 2>&1 || which clang > /dev/null 2>&1 || fail "Please install Xcode or Xcode Command Line Tools to continue"
 
 # Code Signing: See https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html
 APP_SIGN=""
@@ -76,7 +76,7 @@ have_brew=`which brew`
 have_macports=`which port`
 if [ -n "$have_brew" ]; then
     info "Ensuring build prerequisites are installed via brew"
-    for a in autoconf automake coreutils gettext libtool openssl@1.1 readline sqlite3 xz zlib swig ; do
+    for a in autoconf automake coreutils gettext libtool readline sqlite3 xz zlib swig ; do
         brew list $a > /dev/null 2>&1
         if [ "$?" != "0" ]; then
             info "Installing $a"
@@ -85,6 +85,13 @@ if [ -n "$have_brew" ]; then
             info "$a found"
         fi
     done
+    brew list openssl@1.1 > /dev/null 2>&1 || brew list openssl@3 > /dev/null 2>&1
+    if [ "$?" != "0" ]; then
+        info "Installing openssl@3"
+        brew install openssl@3 || fail "Could not install openssl"
+    else
+        info "openssl found"
+    fi
 elif [ -n "$have_macports" ]; then
     have_port_swig_python=`port installed | grep swig-python`
     if [ -z "$have_port_swig_python" ]; then
@@ -140,48 +147,12 @@ rm  -rf $BUILDDIR > /dev/null 2>&1
 mkdir -p $BUILDDIR
 
 info "Building PyInstaller."
-PYINSTALLER_REPO="https://github.com/pyinstaller/pyinstaller.git"
-PYINSTALLER_COMMIT="e20e74c03768d432d48665b8ef1e02511b16e4be"
-# ^ tag "4.3"
-# TODO test newer versions of pyinstaller for build-reproducibility.
-#      we are using this version for now due to change in code-signing behavior
-#      (https://github.com/pyinstaller/pyinstaller/pull/5581)
-(
-    if [ -f "$BUILDDIR/pyinstaller/PyInstaller/bootloader/Darwin-64bit/runw" ]; then
-        info "pyinstaller already built, skipping"
-        exit 0
-    fi
-    pushd "${build_dir}"
-    EC_COMMIT_HASH=$(git rev-parse HEAD)
-    pushd "$BUILDDIR"
-    rm -rf pyinstaller
-    mkdir pyinstaller
-    cd pyinstaller
-    # Shallow clone
-    git init
-    git remote add origin $PYINSTALLER_REPO
-    git fetch --depth 1 origin $PYINSTALLER_COMMIT
-    git checkout -b pinned "${PYINSTALLER_COMMIT}^{commit}"
-    rm -fv PyInstaller/bootloader/Darwin-*/run* || true
-    # add reproducible randomness. this ensures we build a different bootloader for each commit.
-    # if we built the same one for all releases, that might also get anti-virus false positives
-    echo "extern const char * const electron_cash_tag;" >> ./bootloader/src/pyi_main.c
-    echo "const char * const electron_cash_tag = \"tagged by Electron-Cash@$EC_COMMIT_HASH\";" >> ./bootloader/src/pyi_main.c
-    pushd bootloader
-    # compile bootloader
-    python3 ./waf all CFLAGS="-static"
-    popd
-    # sanity check bootloader is there:
-    [[ -e "PyInstaller/bootloader/Darwin-64bit/runw" ]] || fail "Could not find runw in target dir!"
-    rm pyinstaller.py  # workaround for https://github.com/pyinstaller/pyinstaller/pull/6701
-    popd # $BUILDDIR
-    popd # $build_dir
-) || fail "PyInstaller build failed"
+PYINSTALLER_PIP_VERSION="5.13.2"
+PYINSTALLER_HOOKS_VERSION="2023.8"
 
 info "Installing PyInstaller"
-# Use the one we just built above
-python3 -m pip install --user --upgrade --no-warn-script-location "$BUILDDIR/pyinstaller" \
-    && pyenv rehash || fail "Could not install PyInstaller"
+python3 -m pip install --user --upgrade --no-warn-script-location "pyinstaller==$PYINSTALLER_PIP_VERSION"     && pyenv rehash || fail "Could not install PyInstaller"
+python3 -m pip install --user --upgrade --no-warn-script-location "pyinstaller-hooks-contrib==$PYINSTALLER_HOOKS_VERSION"     || fail "Could not install compatible PyInstaller hooks"
 
 info "Using these versions for building $PACKAGE:"  # NB: PACKAGE var comes from ../base.sh
 sw_vers
@@ -191,8 +162,9 @@ pyinstaller --version
 
 rm -rf ./dist
 
-info "Making locale..."
-python3 ./contrib/make_locale || fail "Failed to make locale..."
+info "Skipping locale generation (using existing locale files)..."
+# python3 ./contrib/make_locale || fail "Failed to make locale..."
+# Locale files already exist in contrib/electrum-locale/locale submodule
 
 info "Downloading libusb..."
 curl -L https://github.com/cculianu/Electron-Cash-Build-Tools/releases/download/v1.0/libusb-1.0.21.el_capitan.bottle.tar.gz | \
@@ -223,10 +195,26 @@ popd
 cp -fp contrib/secp256k1/.libs/libsecp256k1.0.dylib contrib/osx || fail "Could not copy secp256k1 binary to its destination"
 
 info "Building integrated Tor"
-contrib/make_zlib && contrib/make_libevent && contrib/make_openssl && contrib/make_tor || fail "Could not build Tor"
+# Use system OpenSSL instead of building custom one to avoid CMAC compatibility issues with cryptography package
+contrib/make_zlib && contrib/make_libevent && contrib/make_tor || fail "Could not build Tor"
 
 
 info "Installing requirements..."
+# Using system OpenSSL (Homebrew) instead of custom build
+OPENSSL_DIST="/opt/homebrew/opt/openssl@3"
+if [ ! -d "$OPENSSL_DIST" ]; then
+    OPENSSL_DIST="/opt/homebrew/opt/openssl@1.1"
+fi
+if [ ! -d "$OPENSSL_DIST" ]; then
+    OPENSSL_DIST="/usr/local/opt/openssl@3"
+fi
+if [ ! -d "$OPENSSL_DIST" ]; then
+    OPENSSL_DIST="/usr/local/opt/openssl@1.1"
+fi
+export CPPFLAGS="-I$OPENSSL_DIST/include ${CPPFLAGS:-}"
+export LDFLAGS="-L$OPENSSL_DIST/lib ${LDFLAGS:-}"
+export PKG_CONFIG_PATH="$OPENSSL_DIST/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+info "Using system OpenSSL at: $OPENSSL_DIST"
 python3 -m pip install -r ./contrib/deterministic-build/requirements.txt --user || fail "Could not install requirements"
 python3 -m pip install -r ./contrib/deterministic-build/requirements-binaries.txt --user || fail "Could not install binary requirements"
 python3 -m pip install --no-deps --no-warn-script-location -r ./contrib/deterministic-build/requirements-web3.txt --user || fail "Could not install web3 requirements"
@@ -239,7 +227,7 @@ info "Building $PACKAGE..."
 python3 setup.py install --user > /dev/null || fail "Could not build $PACKAGE"
 
 info "Building binary"
-pyinstaller --clean --noconfirm --ascii --name $VERSION contrib/osx/osx.spec || fail "Could not build binary"
+EC_PACKAGE_VERSION="$VERSION" pyinstaller --clean --noconfirm --ascii contrib/osx/osx.spec || fail "Could not build binary"
 
 info "Adding bitcoincash & cashacct URI types to Info.plist"
 # NB: Make sure there are no trailing spaces after the '\' characters here

@@ -12,8 +12,8 @@ import platform
 if sys.platform != "darwin":
     from ._dummy import *
 else:
-    from distutils.version import LooseVersion as V
-    if V(platform.mac_ver()[0]) < V("10.14"):
+    from packaging.version import Version as V
+    if sys.version_info >= (3, 14) or V(platform.mac_ver()[0]) < V("10.14"):
         from ._dummy import *
     else:
         from ._detect import *

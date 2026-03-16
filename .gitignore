@@ -39,3 +39,4 @@ xcuserdata/
 # mypy
 .mypy_cache/
 
+Electron_Radiant.egg-info/

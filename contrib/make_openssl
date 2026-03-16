@@ -22,6 +22,12 @@ pkgname="openssl"
 info "Building $pkgname..."
 
 pushd "$here"/$pkgname || fail "Could not chdir to $here/$pkgname"
+if [ "$BUILD_TYPE" = "darwin" ] && [ -f dist/bin/openssl ] ; then
+    if ! file dist/bin/openssl | grep -q "$(uname -m)" ; then
+        rm -rf dist
+        make clean || true
+    fi
+fi
 if ! [ -d dist ] ; then
     (
         case $BUILD_TYPE in
@@ -29,7 +35,11 @@ if ! [ -d dist ] ; then
                 ./config --prefix="$here/$pkgname/dist" $CONFIG_OPTIONS
                 ;;
             darwin)
-                ./Configure darwin64-x86_64-cc --prefix="$here/$pkgname/dist" $CONFIG_OPTIONS
+                openssl_target="darwin64-x86_64-cc"
+                if [ "$(uname -m)" = "arm64" ] ; then
+                    openssl_target="darwin64-arm64-cc"
+                fi
+                ./Configure "$openssl_target" --prefix="$here/$pkgname/dist" $CONFIG_OPTIONS
                 ;;
             wine)
                 ./Configure --cross-compile-prefix=${GCC_TRIPLET_HOST}- mingw --prefix="$here/$pkgname/dist" $CONFIG_OPTIONS

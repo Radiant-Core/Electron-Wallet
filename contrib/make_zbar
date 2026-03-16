@@ -16,7 +16,18 @@ fi
 if ! [ -x configure ] ; then
     autoreconf -vfi || fail "Could not run autoreconf for $pkgname. Please make sure you have automake and libtool installed, and try again."
 fi
+if [ "$BUILD_TYPE" = "darwin" ] ; then
+    rm -f config.status
+fi
 if ! [ -r config.status ] ; then
+    if [ "$BUILD_TYPE" = "darwin" ] ; then
+        libiconv_prefix="$(brew --prefix libiconv 2>/dev/null || true)"
+        if [ -n "$libiconv_prefix" ] ; then
+            export CPPFLAGS="-I$libiconv_prefix/include${CPPFLAGS:+ $CPPFLAGS}"
+            export LDFLAGS="-L$libiconv_prefix/lib${LDFLAGS:+ $LDFLAGS}"
+            export LIBS="-liconv${LIBS:+ $LIBS}"
+        fi
+    fi
     ./configure \
         $AUTOCONF_FLAGS \
         --prefix="$here/$pkgname/dist" \

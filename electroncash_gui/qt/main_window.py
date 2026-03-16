@@ -751,7 +751,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
         help_menu.addAction(_("&About"), self.show_about)
         help_menu.addAction(_("About Qt"), self.app.aboutQt)
         help_menu.addAction(_("&Check for Updates"), lambda: self.gui_object.show_update_checker(self))
-        help_menu.addAction(_("&Official Website"), lambda: webopen("https://github.com/RadiantBlockchain/electron-radiant"))
+        help_menu.addAction(_("&Official Website"), lambda: webopen("https://github.com/Radiant-Core/Electron-Wallet"))
         help_menu.addSeparator()
         help_menu.addAction(_("Documentation"), lambda: webopen("http://electroncash.readthedocs.io/")).setShortcut(QKeySequence.HelpContents)
         help_menu.addAction(_("&Report Bug..."), self.show_report_bug)
@@ -812,7 +812,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
     def show_report_bug(self):
         msg = ' '.join([
             _("Please report any bugs as issues on github:<br/>"),
-            "<a href=\"https://github.com/RadiantBlockchain/electron-radiant/issues\">https://github.com/RadiantBlockchain/electron-radiant/issues</a><br/><br/>",
+            "<a href=\"https://github.com/Radiant-Core/Electron-Wallet/issues\">https://github.com/Radiant-Core/Electron-Wallet/issues</a><br/><br/>",
             _("Before reporting a bug, upgrade to the most recent version of Electron Radiant (latest release or git HEAD), and include the version number in your report."),
             _("Try to explain not only what the bug is, but how it occurs.")
          ])

@@ -8,13 +8,16 @@ DISTDIR="$PROJECT_ROOT/dist"
 
 export GCC_STRIP_BINARIES="1"
 export GIT_SUBMODULE_FLAGS="--recommend-shallow --depth 1"
+export GIT_SUBMODULE_SKIP=1
 
 . "$CONTRIB"/base.sh
+unset GIT_SUBMODULE_SKIP
 
 rm -fvr "$DISTDIR"
 mkdir -p "$DISTDIR"
 
 python3 --version || fail "No python"
+
 
 pushd $PROJECT_ROOT
 

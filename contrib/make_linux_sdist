@@ -13,7 +13,23 @@ pushd "$contrib"/..
 
 # EC_PACKAGE_VERSION and EC_PACKAGE_NAME are used by setup.py to specify
 # generated filename with a version from git tag. Otherwise defaults are used.
-EC_PACKAGE_VERSION=`git_describe_filtered` || fail "Could not get determine git tag version"
+RAW_PACKAGE_VERSION=`git_describe_filtered` || fail "Could not get determine git tag version"
+EC_PACKAGE_VERSION=`python3 - "$RAW_PACKAGE_VERSION" <<'EOF'
+import re
+import sys
+raw = sys.argv[1].strip()
+raw = raw.lstrip('v')
+m = re.match(r'^(.+?)-(\d+)-g([0-9a-f]+)(-dirty)?$', raw)
+if m:
+    base, distance, commit, dirty = m.groups()
+    version = f"{base}.post{distance}+g{commit}"
+    if dirty:
+        version += ".dirty"
+    print(version)
+else:
+    print(raw.replace('-dirty', '+dirty'))
+EOF
+` || fail "Could not normalize package version"
 EC_PACKAGE_NAME="${PACKAGE}"
 export EC_PACKAGE_VERSION EC_PACKAGE_NAME
 
