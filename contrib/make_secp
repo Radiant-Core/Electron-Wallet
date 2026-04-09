@@ -10,8 +10,10 @@ info "Building $pkgname..."
 
 pushd "$here"/$pkgname || fail "Could not chdir to $here/$pkgname"
 if ! [ -x configure ] ; then
-    echo "libsecp256k1_la_LDFLAGS = -no-undefined" >> Makefile.am
-    echo "LDFLAGS = -no-undefined" >> Makefile.am
+    if ! grep -q "libsecp256k1_la_LDFLAGS = -no-undefined" Makefile.am ; then
+        echo "libsecp256k1_la_LDFLAGS = -no-undefined" >> Makefile.am
+        echo "LDFLAGS = -no-undefined" >> Makefile.am
+    fi
     ./autogen.sh || fail "Could not run autogen for $pkgname. Please make sure you have automake and libtool installed, and try again."
 fi
 if ! [ -r config.status ] ; then
