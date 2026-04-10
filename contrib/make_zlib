@@ -19,10 +19,12 @@ if [ "$BUILD_TYPE" = "wine" ] ; then
         install
 else
     if ! [ -r config.status ] ; then
+        # Add flags to suppress C23 deprecation warnings on newer compilers
+        export CFLAGS="${CFLAGS:--Wno-deprecated-non-prototype -std=c11}"
         ./configure \
             --prefix="$here/$pkgname/dist" || fail "Could not configure $pkgname"
     fi
-    make -j$WORKER_COUNT || fail "Could not build $pkgname"
+    make -j$WORKER_COUNT CFLAGS="${CFLAGS:--Wno-deprecated-non-prototype -std=c11}" || fail "Could not build $pkgname"
     make install || fail "Could not install $pkgname"
 fi
 popd

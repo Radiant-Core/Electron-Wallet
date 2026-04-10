@@ -548,7 +548,11 @@ def _match_hostname(name, val):
     if val == name:
         return True
 
-    return val.startswith('*.') and name.endswith(val[1:])
+    if not val.startswith('*.'):
+        return False
+    # Wildcard only matches a single label: *.bar.com matches foo.bar.com but not sub.foo.bar.com
+    suffix = val[1:]  # e.g. ".bar.com"
+    return name.endswith(suffix) and name.count('.') == val.count('.')
 
 
 def test_certificates():

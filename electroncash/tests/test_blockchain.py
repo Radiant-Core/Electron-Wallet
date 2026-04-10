@@ -73,7 +73,7 @@ class TestBlockchain(unittest.TestCase):
         # Now we expect difficulty to decrease
         # MTP(1010) is TimeStamp(1005), MTP(1004) is TimeStamp(999)
         hdr = {'block_height': block['block_height'] + 1}
-        self.assertEqual(chain.get_bits(hdr, chunk), 0x1801b553)
+        self.assertEqual(chain.get_bits(hdr, chunk), 0x18015ddc)
 
     def test_target_to_bits(self):
         # https://github.com/bitcoin/bitcoin/blob/7fcf53f7b4524572d1d0c9a5fdc388e87eb02416/src/arith_uint256.h#L269

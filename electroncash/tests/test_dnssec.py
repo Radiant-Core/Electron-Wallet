@@ -1,3 +1,5 @@
+import unittest
+
 import dns
 
 from dns.dnssec import ValidationFailure
@@ -6,7 +8,14 @@ from electroncash import dnssec
 
 from . import ElectronCashTestCase
 
+try:
+    import cryptography  # noqa: F401
+    _cryptography_available = True
+except ImportError:
+    _cryptography_available = False
 
+
+@unittest.skipUnless(_cryptography_available, "cryptography package not installed")
 class TestDnsSec(ElectronCashTestCase):
 
     def test_validate_rrsig_ecdsa(self):

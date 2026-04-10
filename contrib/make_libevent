@@ -15,6 +15,10 @@ openssl_lib="$openssl_prefix/lib"
 if ! [ -x configure ] ; then
     ./autogen.sh || fail "Could not configure $pkgname"
 fi
+# Force reconfigure on Darwin/macOS to prevent stale Linux configuration
+if [ "$BUILD_TYPE" = "darwin" ] ; then
+    rm -f config.status
+fi
 if ! [ -r config.status ] ; then
     ./configure \
         $AUTOCONF_FLAGS \

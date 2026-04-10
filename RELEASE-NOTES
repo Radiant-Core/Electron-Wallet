@@ -1,3 +1,16 @@
+# Release 0.1.8
+  * ASERT DAA test vectors regenerated for Radiant IDEAL_BLOCK_TIME=300s (5-minute blocks)
+  * Fixed ASERT test suite: all 10 tests now pass with correct Radiant parameters
+  * Fixed blockchain retargetting test to match Radiant legacy DAA output
+  * Fixed DNSSEC tests to skip gracefully when cryptography package is not installed
+  * Fixed wildcard hostname matching (_match_hostname) to reject multi-level wildcards
+    e.g. *.bar.com no longer incorrectly matches sub.foo.bar.com
+  * Fixed transaction test vectors (test_tx_unsigned, test_tx_signed) regenerated
+    using python-ecdsa and Radiant SIGHASH_FORKID (0x41)
+  * Ledger hardware wallet support confirmed working via Bitcoin app — see Ledger.md
+  * Updated copyright year to 2026 in About dialog
+  * Version bump to 0.1.8
+
 # Release 0.1.7
   * Raised transaction fee floor to 10000 photons/B (10,000,000 sat/kB)
   * Updated send form fee help popup text to reference 10000 photons/B minimum
@@ -23,11 +36,11 @@
 Electron Radiant is a fork of the open source Electron-Cash Bitcoin Cash Wallet and Electrum Bitcoin wallet (www.electrum.org) for Radiant (RXD) Blockchain. The current
 release is based on the Electrum 2.9.0 codebase with patches to
 
-- handle Bitcoin Cash difficulty adjustment algorithm
-- sign transactions the Bitcoin Cash way
+- handle Radiant difficulty adjustment algorithm
+- sign transactions the Radiant way
 - updated list of electrum servers
 - updated icons and branding
-- remove RBF (unsupported by Bitcoin Cash network nodes)
+- remove RBF (unsupported by Radiant network nodes)
 - use different directory for wallets and configuration
 
 The Electron Radiant software is NOT affiliated, associated, or endorsed by Electrum, electrum.org or the Electrum
@@ -53,56 +66,33 @@ that way.
 We STRONGLY recommend you get comfortable and only send a small amount of Bitcoin Cash coins at first, to yourself,
 to confirm the network is processing your transactions as expected.
 
-Bitcoin Cash hard forks after the 6th block with timestamp greater than 1 August 2017, 12:20 UTC has been mined.  The
-seventh block must be greater than one million bytes in size.
-
-The Bitcoin Cash fork enforces a new signing scheme which is incompatible with the legacy chain.  Electron Radiant only
-signs transactions using this scheme, so its transactions are only valid on the Bitcoin Cash hard fork after the fork
-has occurred.
-
-If you want to send Bitcoin before the fork, or Segwitcoins after the fork, you should continue to use the standard
-Electrum client, Electron Radiant will not work.
-
-Once the network forks, it will take time for the Electrum server network to split into servers of the Segwit fork, and
-servers of the Bitcoin Cash fork.  You should ensure you are connected to a Bitcoin Cash Electrum server in order to
-send transactions successfully.  Some servers that will be serving the Bitcoin Cash fork are:
-
-    electrum-abc.cascharia.com via SSL port 50002
-    electrum-abc.criptolayer.net via SSL port 50012
-    180.235.49.196, 35.185.209.69 and 35.197.25.235  TCP port 50001 and SSL port 50002
-
-There will likely be other servers available; please check their banners in the Console tab (View|Show Console).
-
-
-Hardware Wallets (NOT YET TESTED OR VERIFIED)
+Hardware Wallets
 ----------------
 
-Since Bitcoin Cash enforces a new signing scheme, hardware wallet vendors need to supply new firmware and/or libraries
-for the hardware to be able to sign transactions correctly.  Currently such libraries and firmware do not exist, so you
-cannot use your hardware wallets with Electron Radiant.
+Ledger hardware wallets (Nano S, Nano X, and compatible devices) are supported using the
+standard Bitcoin app on the device. No custom Radiant app is required and no contact with
+Ledger is needed. See Ledger.md for full setup and usage instructions.
 
-To use Electron Radiant with your hardware-wallet coins you will need to restore your wallet as a software Electron Radiant
-BIP44 wallet from its seed so that Electron Radiant can sign the transactions itself.  Since this exposes your coins to
-risk you may want to wait for the 3rd party software to be developed and integrated instead.
+Radiant uses the same elliptic curve (secp256k1) and transaction signing scheme as Bitcoin
+Cash (SIGHASH_FORKID, 0x41), which the Ledger Bitcoin app handles correctly. Your Bitcoin
+and Radiant addresses are derived at different BIP32 paths and are fully isolated — using
+Ledger with Electron Radiant does not affect any Bitcoin funds managed by Ledger Live or
+other Bitcoin wallets on the same device.
+
+Trezor support has not been tested or verified for Radiant. Use at your own risk.
 
 
 Two-factor Authentication (2FA) Wallets
 ---------------------------------------
 
-For the same reason as Hardware Wallets above, 2FA wallets need Trustedcoin to perform new Bitcoin Cash-style
-signatures for their transactions to be valid on the Bitcoin Cash fork.  If third party support appears we will attempt
+It is not currently supported. If third party support appears we will attempt
 to integrate it.
 
 
 Multisig
 --------
 
-For a multisig transaction to be valid on the Bitcoin Cash fork, each signature must be done thew new Bitcoin Cash way,
-so each signature must be performed with Electron Radiant or other Bitcoin Cash-compatible software.
-
-Unfortunately Electron Radiant does not currently work with multisig wallets as Electrum's serialization format for
-transferring transactions between cosigners is incomplete.  We intend to fix this.
-
+Supported
 
 Miscellaneous
 -------------

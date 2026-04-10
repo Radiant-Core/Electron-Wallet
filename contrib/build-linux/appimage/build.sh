@@ -114,7 +114,7 @@ FRESH_CLONE_DIR=$FRESH_CLONE/$GIT_DIR_NAME
 
 overlay_local_fixes "$SOURCE_ROOT" "$FRESH_CLONE_DIR"
 
-mkdir "$FRESH_CLONE_DIR/contrib/build-linux/home" || fail "Failed to create home directory"
+mkdir -p "$FRESH_CLONE_DIR/contrib/build-linux/home" || fail "Failed to create home directory"
 
 (
     # NOTE: We propagate forward the GIT_REPO override to the container's env,
