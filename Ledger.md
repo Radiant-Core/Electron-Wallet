@@ -3,14 +3,27 @@
 Electron Radiant supports Ledger hardware wallets using the standard **Bitcoin app** already
 installed on your device. No custom Radiant app is required, and no contact with Ledger is needed.
 
-Supported devices: **Nano S**, **Nano S Plus**, **Nano X**, and compatible Ledger models.
+Supported devices: **Nano S**, **Nano S Plus**, **Nano X**, **Stax**, **Flex**, and all compatible
+Ledger models (vendor ID `0x2c97`).
+
+| Device | Bitcoin app required |
+|---|---|
+| Nano S (original) | v1.x or v2.0.x (legacy protocol) |
+| Nano X | v2.1+ (new protocol, auto-detected) |
+| Nano S Plus | v2.1+ (new protocol, auto-detected) |
+| Stax | v2.1+ (new protocol, auto-detected) |
+| Flex | v2.1+ (new protocol, auto-detected) |
+
+Electron Radiant automatically detects which protocol your device uses and switches between
+the legacy `btchip` path and the new PSBT-based `ledger_bitcoin` path accordingly. No
+configuration is needed.
 
 ---
 
 ## How It Works
 
 Radiant (RXD) uses the same elliptic curve cryptography (secp256k1) and transaction signing
-scheme as Bitcoin Cash — specifically `SIGHASH_ALL | SIGHASH_FORKID` (0x41). The Ledger Bitcoin
+scheme as Bitcoin — specifically `SIGHASH_ALL | SIGHASH_FORKID` (0x41). The Ledger Bitcoin
 app is capable of performing this signing operation correctly, which is why no dedicated Radiant
 app is needed.
 
@@ -38,16 +51,21 @@ the signatures it produces are fully valid for Radiant transactions.
 Before connecting your Ledger to Electron Radiant, ensure the following are installed:
 
 ```bash
-pip install btchip-python hidapi
+pip install ledger_bitcoin ledgercomm hidapi
 ```
 
-These provide the USB HID communication layer (`hid`) and Ledger protocol library (`btchip`)
-required by the Ledger plugin. Without them, the plugin will silently skip loading.
+These provide:
+- `ledger_bitcoin` — the modern Ledger Bitcoin app protocol library (app v2.1+, all current devices)
+- `ledgercomm` — USB/HID transport layer used by `ledger_bitcoin`
+- `hidapi` — low-level USB HID access (required by both protocol paths)
 
-You can verify they are available by running:
+The `ledger_bitcoin` package also bundles the legacy `btchip` protocol internally, so no
+separate `btchip-python` install is needed.
+
+You can verify the installation by running:
 
 ```bash
-python3 -c "import hid; from btchip.btchip import btchip; print('OK')"
+python3 -c "import ledger_bitcoin; import hid; print('OK')"
 ```
 
 ---
@@ -131,12 +149,13 @@ If your firmware is too old, Electron Radiant will show an error with a link to 
 | "Ledger not detected" | Make sure the Bitcoin app is open on the device, not the dashboard |
 | "Not in Bitcoin mode" | Close other apps on the device and open the Bitcoin app |
 | "Temporarily locked" | Unplug and replug the device, reopen the Bitcoin app |
-| "Invalid channel" | Disable "Browser support" in the Bitcoin app settings on the device |
+| "Invalid channel" | Disable "Browser support" in the Bitcoin app settings on the device (Nano S only) |
 | "Wallet locked" | Enter your PIN on the device to unlock it |
 | Device not found on Linux | Install udev rules (see Linux section above) |
 | `ImportError: No module named 'hid'` | Run `pip install hidapi` |
-| `ImportError: No module named 'btchip'` | Run `pip install btchip-python` |
-| **"Use a hardware device" option not showing** | Ensure `btchip-python` is installed. The option only appears when the Ledger library is available. See Prerequisites above. |
+| `ImportError: No module named 'ledger_bitcoin'` | Run `pip install ledger_bitcoin ledgercomm` |
+| **"Use a hardware device" option not showing** | Ensure `ledger_bitcoin` is installed. The option only appears when the Ledger library is available. See Prerequisites above. |
+| Modern device (Nano X / S Plus / Stax / Flex) not signing | Ensure you are running Ledger Bitcoin app v2.1 or newer on the device |
 
 ---
 
@@ -157,8 +176,10 @@ If your firmware is too old, Electron Radiant will show an error with a link to 
 For developers or advanced users:
 
 - **Signing**: `sighashType = 0x41` (`SIGHASH_ALL | SIGHASH_FORKID`) — set in
-  `electroncash_plugins/ledger/ledger.py`
-- **Communication**: USB HID via `btchip-python` library
+  `electroncash_plugins/ledger/ledger.py` for both protocol paths
+- **Legacy protocol** (app v1.x / v2.0): USB HID via `btchip` APDU protocol (`Ledger_Client_Legacy`)
+- **New protocol** (app v2.1+): PSBT-based signing via `ledger_bitcoin` library (`Ledger_Client_New`)
+- **Auto-detection**: `LedgerPlugin.create_client()` probes the device and chooses the correct client automatically
 - **Key derivation**: BIP32/BIP44 derivation performed on-device, path configured in wallet setup
 - **Plugin location**: `electroncash_plugins/ledger/`
-- **Protocol**: Ledger APDU protocol via `btchip.btchip`
+- **SIGHASH_FORKID injection**: For the new PSBT path, `0x41` is written into `PSBT_IN_SIGHASH_TYPE` per input before `sign_psbt()` is called

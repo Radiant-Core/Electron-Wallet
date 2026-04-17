@@ -1409,7 +1409,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
                 addr = self.wallet.get_receiving_address()
             else:
                 # Warn if past gap limit.
-                if not self.question(_("Warning: The next address will not be recovered automatically if you restore your wallet from seed; you may need to add it manually.\n\nThis occurs because you have too many unused addresses in your wallet. To avoid this situation, use the existing addresses first.\n\nCreate anyway?")):
+                if not self.question(_("Warning: The next address will not be recovered automatically if you restore your wallet from seed; you may need to add it manually.\n\nThis occurs because you have too many unused addresses in your wallet. To avoid this situation, use the existing addresses first.\n\nCreate anyway?"), icon=QMessageBox.Warning):
                     return
                 addr = self.wallet.create_new_address(False)
         self.set_receive_address(addr)
@@ -2047,7 +2047,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
                     msg = _('WARNING: the alias "{}" could not be validated via an additional '
                         'security check, DNSSEC, and thus may not be correct.').format(alias) + '\n'
                     msg += _('Do you wish to continue?')
-                    if not self.question(msg):
+                    if not self.question(msg, icon=QMessageBox.Warning):
                         return
 
             try:
@@ -2220,7 +2220,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
         else:
             msg.append(_('Proceed?'))
             password = None
-            if not self.question('\n\n'.join(msg)):
+            if not self.question('\n\n'.join(msg), icon=QMessageBox.Information):
                 return
 
         def sign_done(success):
@@ -2307,7 +2307,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
         if (isinstance(fee, int) and tx.is_complete() and fee < (10000 * (len(str(tx))//2))
                 and not tx.ephemeral.get('warned_low_fee_already')):
             msg = _('Warning') + ': ' + _("You're using a fee of less than 10000 photons/B. It may take a very long time to confirm.") + "\n\n" + _("Proceed?")
-            if not self.question(msg, title = _("Low Fee")):
+            if not self.question(msg, title=_("Low Fee"), icon=QMessageBox.Warning):
                 return
         # /end fee check
 
@@ -2594,7 +2594,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
 
     def remove_address(self, addr):
         if self.question(_("Do you want to remove {} from your wallet?"
-                           .format(addr.to_ui_string()))):
+                           .format(addr.to_ui_string())), icon=QMessageBox.Warning):
             self.wallet.delete_address(addr)
             self.update_tabs()
             self.update_status()
@@ -2762,7 +2762,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
         else:
             # Note: we didn't use ngettext here for plural check because n > 1 in this branch
             qtext = _("Remove {number_of_contacts} contacts from your contact list?").format(number_of_contacts=n)
-        if not self.question(qtext):
+        if not self.question(qtext, icon=QMessageBox.Warning):
             return
         removed_entries = []
         for contact in contacts:
@@ -2847,7 +2847,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
             self.show_message(_('Invoice saved as' + ' ' + fn))
         exportButton = EnterButton(_('Save'), do_export)
         def do_delete():
-            if self.question(_('Delete invoice?')):
+            if self.question(_('Delete invoice?'), icon=QMessageBox.Warning):
                 self.invoices.remove(key)
                 self.history_list.update()
                 self.history_updated_signal.emit() # inform things like address_dialog that there's a new history
@@ -3106,7 +3106,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
         if self.question('\n'.join([
                 _('Delete wallet file?'),
                 "%s"%self.wallet.storage.path,
-                _('If your wallet contains funds, make sure you have saved its seed.')])):
+                _('If your wallet contains funds, make sure you have saved its seed.')]), icon=QMessageBox.Warning):
             self._delete_wallet()
 
     @protected
@@ -4947,7 +4947,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
             _('Just to be safe, back up your wallet file first!'),
             "\n\n"+_("Rebuild this wallet's history now?")
         ])
-        if self.question(msg, title=_("Rebuild Wallet History")):
+        if self.question(msg, title=_("Rebuild Wallet History"), icon=QMessageBox.Warning):
             try:
                 self.wallet.rebuild_history()
             except RuntimeError as e:

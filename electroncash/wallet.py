@@ -2339,6 +2339,10 @@ class Abstract_Wallet(PrintError, SPVDelegate):
                     txin['prev_tx'] = inputtx   # may be needed by hardware wallets
 
     def add_hw_info(self, tx):
+        # Give hardware keystores a reference to this wallet (for network access etc.)
+        for k in self.get_keystores():
+            if isinstance(k, Hardware_KeyStore):
+                k.wallet = self
         # add previous tx for hw wallets, if needed and not already there
         if any([(isinstance(k, Hardware_KeyStore) and k.can_sign(tx) and k.needs_prevtx()) for k in self.get_keystores()]):
             for txin in tx.inputs():

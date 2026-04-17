@@ -437,11 +437,13 @@ class Ledger_Client_New:
 
     @test_pin_unlocked
     def sign_transaction(self, tx, password, signing_info):
-        """Sign a transaction using hybrid approach.
-        
-        For Bitcoin app v2.1+: Use btchip APDUs directly instead of PSBT to get
-        proper SIGHASH_FORKID support. For BCH app: Use standard flow.
-        
+        """Sign a Radiant transaction using PSBTv2 and the custom app-radiant firmware.
+
+        Constructs a PSBTv2 with SIGHASH_FORKID|SIGHASH_ALL (0x41) per input,
+        sets witness_utxo (amount + scriptPubKey) and non_witness_utxo (full prev tx
+        so the device can verify the txid), and uses a standard pkh(@0/**) wallet
+        policy matching Electron Wallet's m/44'/0'/0' derivation.
+
         signing_info: list of (signing_pos, full_path, pubkey_hex, prev_tx_raw,
                                prevout_n, redeem_script_hex, sequence, amount)
                       as built by Ledger_KeyStore.sign_transaction.
@@ -449,75 +451,57 @@ class Ledger_Client_New:
         if tx.is_complete():
             return
 
-        print_error(f"[Ledger] Ledger_Client_New.sign_transaction: {len(signing_info)} inputs")
-        for si in signing_info:
-            print_error(f"[Ledger]   path={si[1]} prevout_n={si[4]} raw_len={len(si[3]) if si[3] else 0}")
+        print_error(f"[Ledger] Ledger_Client_New.sign_transaction (PSBTv2): {len(signing_info)} inputs")
 
-        # Try hybrid btchip approach first (works with Bitcoin app v2.1+)
-        try:
-            self._sign_transaction_hybrid_btchip(tx, password, signing_info)
-            return
-        except Exception as e:
-            print_error(f"[Ledger] Hybrid btchip signing failed: {e}")
-            # Fall back to PSBT method (may not work for Radiant but worth trying)
-        
-        # --- PSBT fallback (BCH app or as last resort) ---
         try:
             from ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
-            from ledger_bitcoin.tx import CTransaction, CTxIn, CTxOut, COutPoint, uint256_from_str
+            from ledger_bitcoin.tx import CTxOut, CTransaction
+            from io import BytesIO
 
             fpr = self.get_master_fingerprint()
 
-            # Use Electron's txin list directly for the unsigned tx structure
-            ctxins = []
-            ctxouts = []
-            for txin in tx.inputs():
-                # prevout_hash is display-format (reversed bytes of the raw txid).
-                # COutPoint.hash must be the raw txid bytes interpreted as a
-                # little-endian 256-bit integer: reverse the display bytes first.
-                prevout_hash_int = int.from_bytes(bfh(txin['prevout_hash'])[::-1], 'little')
-                ctxins.append(CTxIn(
-                    outpoint=COutPoint(prevout_hash_int, txin['prevout_n']),
-                    nSequence=txin.get('sequence', 0xffffffff - 1),
-                ))
-            for _type, addr, amount in tx.outputs():
-                script_hex = tx.pay_script(addr)
-                ctxouts.append(CTxOut(nValue=amount, scriptPubKey=bfh(script_hex)))
+            # --- Build PSBTv2 ---
+            psbt = PSBT()
+            psbt.version = 2
+            psbt.explicit_version = True
+            psbt.tx_version = tx.version
+            psbt.fallback_locktime = tx.locktime
 
-            unsigned_tx = CTransaction()
-            unsigned_tx.nVersion = tx.version
-            unsigned_tx.nLockTime = tx.locktime
-            unsigned_tx.vin = ctxins
-            unsigned_tx.vout = ctxouts
-
-            # --- Build PSBTv0 ---
-            psbt = PSBT(tx=unsigned_tx)
-            for _i in signing_info:
-                psbt.inputs.append(PartiallySignedInput(version=0))
-            for _i in tx.outputs():
-                psbt.outputs.append(PartiallySignedOutput(version=0))
-
-            # --- Populate each PSBT input ---
+            # --- Populate inputs ---
             for idx, info in enumerate(signing_info):
                 (signing_pos, full_path, pubkey_hex,
                  prev_tx_raw, prevout_n, redeem_script_hex, sequence, amount) = info
 
-                psbt_in = psbt.inputs[idx]
+                psbt_in = PartiallySignedInput(version=2)
 
-                # non_witness_utxo: the full previous transaction (required by Ledger
-                # for legacy P2PKH inputs). SHA256d txid from rehash() matches the
-                # outpoint hash set in COutPoint above, satisfying PSBT validation.
-                prev_ctx = CTransaction()
-                from io import BytesIO
-                prev_ctx.deserialize(BytesIO(bfh(prev_tx_raw)))
-                prev_ctx.rehash()
-                psbt_in.non_witness_utxo = prev_ctx
+                # prev_txid: 32-byte little-endian txid bytes
+                # prevout_hash is the display hex (reversed); reverse back to LE bytes
+                txin = tx.inputs()[idx]
+                prevout_hash_le = bfh(txin['prevout_hash'])[::-1]
+                psbt_in.prev_txid = prevout_hash_le
+                psbt_in.prev_out = prevout_n
+                psbt_in.sequence = sequence
 
-                # Do NOT set psbt_in.sighash — the Ledger Bitcoin app only
-                # accepts standard sighash types (SIGHASH_ALL=1). We force
-                # the SIGHASH_FORKID byte (0x41) when writing sigs back below.
+                # SIGHASH_FORKID | SIGHASH_ALL — required for Radiant
+                psbt_in.sighash = self.SIGHASH_FORKID
 
-                # BIP-32 derivation path
+                # witness_utxo: amount (satoshis) + scriptPubKey of the spent output
+                # redeemScript from Electron is already the scriptPubKey for P2PKH
+                script_pubkey = bfh(redeem_script_hex)
+                # For P2PKH inputs the "redeemScript" IS the scriptPubKey;
+                # amount comes from the txin dict (set by wallet from UTXO)
+                utxo_amount = txin.get('value', amount)  # satoshis
+                psbt_in.witness_utxo = CTxOut(nValue=utxo_amount, scriptPubKey=script_pubkey)
+
+                # non_witness_utxo: full previous transaction so the device can
+                # verify SHA256d(rawTx) == prevTxid (prevents fee manipulation).
+                if prev_tx_raw:
+                    prev_ctx = CTransaction()
+                    prev_ctx.deserialize(BytesIO(bfh(prev_tx_raw)))
+                    prev_ctx.rehash()
+                    psbt_in.non_witness_utxo = prev_ctx
+
+                # BIP-32 derivation path — full path e.g. "44'/0'/0'/0/3"
                 path_parts = full_path.replace('h', "'").split('/')
                 int_path = []
                 for part in path_parts:
@@ -528,18 +512,23 @@ class Ledger_Client_New:
                 pubkey_bytes = bfh(pubkey_hex)
                 psbt_in.hd_keypaths[pubkey_bytes] = KeyOriginInfo(fpr, int_path)
 
-            # --- Determine signing policy ---
+                psbt.inputs.append(psbt_in)
+
+            # --- Populate outputs ---
+            for _type, addr, out_amount in tx.outputs():
+                psbt_out = PartiallySignedOutput(version=2)
+                psbt_out.amount = out_amount
+                psbt_out.script = bfh(tx.pay_script(addr))
+                psbt.outputs.append(psbt_out)
+
+            # --- Wallet policy: pkh(@0/**) at the account path (m/44'/0'/0') ---
             # Strip last 2 path components (change/index) to get account path.
-            # Using split()[:-2] is robust for any derivation depth (e.g. 44'/0'/0',
-            # 44'/0'/0'/0, or custom paths) rather than hardcoding [:3].
-            first_path = signing_info[0][1]
-            account_path = '/'.join(first_path.split('/')[:-2])
+            first_path = signing_info[0][1]  # e.g. "44'/0'/0'/0/3"
+            account_path = '/'.join(first_path.split('/')[:-2])  # "44'/0'/0'"
             policy = self._get_singlesig_policy(account_path)
 
-            print_error(f"[Ledger] policy descriptor={policy.descriptor_template}")
-            print_error(f"[Ledger] policy key_info={policy.keys_info}")
-            print_error(f"[Ledger] policy id={policy.id.hex()}")
-            print_error(f"[Ledger] policy name='{policy.name}' version={policy.version}")
+            print_error(f"[Ledger] policy={policy.descriptor_template} keys={policy.keys_info}")
+
             wallet_hmac = None
             if policy.name != "":
                 __, wallet_hmac = self._register_policy_if_needed(policy)
@@ -552,8 +541,7 @@ class Ledger_Client_New:
                 txin = tx.inputs()[sig_idx]
                 signing_pos = signing_info[sig_idx][0]
                 sig_bytes = bytes(part_sig.signature)
-                # Strip any sighash byte the device appended, then force 0x41
-                # (SIGHASH_ALL | SIGHASH_FORKID) as required by Radiant.
+                # Device appends sighash byte 0x41; normalise in case it used 0x01
                 if sig_bytes and sig_bytes[-1] in (0x01, 0x41):
                     sig_bytes = sig_bytes[:-1]
                 sig_bytes = sig_bytes + bytes([self.SIGHASH_FORKID])
@@ -568,120 +556,6 @@ class Ledger_Client_New:
             self.handler.show_error(str(e))
         finally:
             self.handler.finished()
-
-    def _sign_transaction_hybrid_btchip(self, tx, password, signing_info):
-        """
-        Hybrid signing method that uses custom Radiant BIP143 preimage computation
-        and btchip APDUs for SIGHASH_FORKID support. This bypasses the broken PSBT 
-        flow in Bitcoin app v2.1+ and implements Radiant's modified BIP143 correctly.
-        """
-        print_error("[Ledger] Using hybrid btchip signing with custom Radiant BIP143 preimage")
-        
-        # Access chain: NewClient.transport_client → TransportClient
-        #   → .transport (Transport) → .com (HID ledgercomm object)
-        #   → .device (raw hid.device() handle)
-        tc = getattr(self.client, 'transport_client', None)
-        if tc is None:
-            raise Exception("Cannot access transport_client from ledger_bitcoin NewClient")
-        transport = getattr(tc, 'transport', None)
-        if transport is None:
-            raise Exception("Cannot access transport from TransportClient")
-        hid_com = getattr(transport, 'com', None)
-        if hid_com is None:
-            raise Exception("Cannot access HID com from Transport")
-        raw_hid = getattr(hid_com, 'device', None)
-        if raw_hid is None:
-            raise Exception("Cannot access raw hid.device() from HID com")
-        
-        # Wrap the raw HID handle in HIDDongleHIDAPI for btchip
-        hid_dongle = HIDDongleHIDAPI(raw_hid, True, BTCHIP_DEBUG)
-        btchip_dongle = btchip(hid_dongle)
-        
-        try:
-            signatures = []
-            
-            self.handler.show_message(_('Confirm Transaction on your {}...').format(self.device))
-            
-            # Get PIN first if needed
-            try:
-                btchip_dongle.getOperationMode()
-                pin = ""
-            except Exception as e:
-                if hasattr(e, 'sw') and e.sw == 0x6985:
-                    self.handler.finished()
-                    pin = self.handler.get_auth({'confirmationNeeded': True})
-                    if not pin:
-                        raise UserWarning()
-                    self.handler.show_message(_('Confirmed. Signing Transaction...'))
-                else:
-                    pin = ""
-            
-            # Build transaction data for btchip protocol with Radiant BIP143
-            chipInputs = []
-            redeemScripts = []
-            
-            # Prepare output data
-            from electroncash.bitcoin import int_to_hex, var_int
-            txOutput = var_int(len(tx.outputs()))
-            for txout in tx.outputs():
-                output_type, addr, amount = txout
-                txOutput += int_to_hex(amount, 8)
-                script = tx.pay_script(addr)
-                txOutput += var_int(len(script) // 2)
-                txOutput += script
-            txOutput = bfh(txOutput)
-            
-            # Process each input
-            for idx, info in enumerate(signing_info):
-                (signing_pos, full_path, pubkey_hex,
-                 prev_tx_raw, prevout_n, redeem_script_hex, sequence, amount) = info
-                
-                sequence_hex = int_to_hex(sequence, 4)
-                
-                # Create input for btchip
-                txtmp = bitcoinTransaction(bfh(prev_tx_raw))
-                tmp = bfh(tx.inputs()[idx]['prevout_hash'])[::-1]  # reverse txid
-                tmp += bfh(int_to_hex(prevout_n, 4))
-                tmp += txtmp.outputs[prevout_n].amount
-                chipInputs.append({'value': tmp, 'witness': True, 'sequence': sequence_hex})
-                redeemScripts.append(bfh(redeem_script_hex))
-            
-            # Start transaction with first input
-            inputIndex = 0
-            btchip_dongle.startUntrustedTransaction(True, inputIndex,
-                                                   chipInputs, redeemScripts[inputIndex],
-                                                   cashAddr=True)
-            outputData = btchip_dongle.finalizeInput(b'', 0, 0, "", bfh(tx.serialize(True)))
-            outputData['outputData'] = txOutput
-            
-            if outputData.get('confirmationNeeded'):
-                self.handler.finished()
-                pin = self.handler.get_auth(outputData)
-                if not pin:
-                    raise UserWarning()
-                self.handler.show_message(_('Confirmed. Signing Transaction...'))
-            
-            # Sign each input using btchip with SIGHASH_FORKID
-            for inputIndex, info in enumerate(signing_info):
-                singleInput = [chipInputs[inputIndex]]
-                btchip_dongle.startUntrustedTransaction(False, 0,
-                                                         singleInput, redeemScripts[inputIndex],
-                                                         cashAddr=True)
-                inputSignature = btchip_dongle.untrustedHashSign(
-                    info[1], pin,  # full path
-                    lockTime=tx.locktime,
-                    sighashType=0x41)  # SIGHASH_ALL | SIGHASH_FORKID
-                inputSignature[0] = 0x30  # force for 1.4.9+
-                signatures.append(inputSignature)
-            
-            # Apply signatures to transaction
-            for i, txin in enumerate(tx.inputs()):
-                signingPos = signing_info[i][0]
-                txin['signatures'][signingPos] = bh2u(signatures[i])
-            tx.raw = tx.serialize()
-            
-        except Exception as e:
-            raise e
     
     
     @test_pin_unlocked
@@ -889,8 +763,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
                 if correct_raw is None:
                     print_error(f"[Ledger] using cached prev_tx_raw, len={len(prev_tx_raw) if prev_tx_raw else 0}")
                     correct_raw = prev_tx_raw  # fall back to cached
-                # hwAddress is like "44'/0'/0'/0/3" — strip last two change/index steps for account
-                account_path = '/'.join(hwAddress.split('/')[:3])
+                utxo_value = tx.inputs()[i].get('value', 0)  # satoshis from UTXO set
                 signing_info.append((
                     signingPos,        # position in multisig pubkey list
                     hwAddress,         # full path without m/
@@ -899,7 +772,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
                     prevout_n,
                     redeemScript,
                     sequence,
-                    0,                 # amount (not strictly needed for legacy P2PKH)
+                    utxo_value,        # UTXO amount in satoshis (for witness_utxo)
                 ))
             client_wrapper.sign_transaction(tx, password, signing_info)
             return

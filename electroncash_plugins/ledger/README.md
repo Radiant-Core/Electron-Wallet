@@ -9,8 +9,12 @@ Provides Ledger hardware wallet support for Electron Radiant.
 The plugin supports:
 - ✅ Connecting a Ledger device to derive xpub and generate a watch-only wallet
 - ✅ Displaying receive addresses on the device
-- ✅ **Signing transactions** — requires the custom **Radiant Ledger app** (see below)
+- ✅ **Signing transactions** via PSBTv2 — requires the custom **Radiant Ledger app** (see below)
 - ❌ Signing with stock Bitcoin or Bitcoin Cash app (firmware incompatibility — see below)
+
+### Signing Flow (app-radiant)
+Signing uses **PSBTv2** with `SIGHASH_FORKID|SIGHASH_ALL` (0x41) per input.
+The policy is `pkh(@0/**)` at `m/44'/0'/0'` (standard Radiant P2PKH path).
 
 ---
 
@@ -114,6 +118,6 @@ pip install ledger_bitcoin[hid]   # required for device connection and xpub deri
 
 ## Troubleshooting
 
-- **Device not connecting**: Ensure Bitcoin Cash app is open and Browser support is disabled.
-- **"Signing not supported" error**: Expected — see above. Use a software wallet to sign.
+- **Device not connecting**: Ensure the Radiant app is open on device and Browser support is disabled (Nano S/Blue).
+- **Signing fails**: Ensure the custom **app-radiant** is installed. Signing is not supported with the stock Bitcoin or Bitcoin Cash app.
 - **Device not recognised**: Ensure firmware is up to date via Ledger Live.

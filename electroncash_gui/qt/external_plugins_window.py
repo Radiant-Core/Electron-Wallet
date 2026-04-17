@@ -351,7 +351,7 @@ class ExternalPluginsDialog(WindowModalDialog, MessageBoxMixin):
 
     def on_uninstall_plugin(self):
         package_name = self.pluginsList.get_selected_key()
-        if self.question(_("Are you sure you want to uninstall the selected plugin?")):
+        if self.question(_("Are you sure you want to uninstall the selected plugin?"), icon=QMessageBox.Warning):
             plugin_manager = self.main_window.gui_object.plugins
             plugin_manager.uninstall_external_plugin(package_name)
             self.refresh_ui()

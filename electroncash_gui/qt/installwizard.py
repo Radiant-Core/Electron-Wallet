@@ -251,11 +251,11 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
             self.hide()
             msg = _("The wallet '{}' contains multiple accounts, which are no longer supported since Electrum 2.7.\n\n"
                     "Do you want to split your wallet into multiple files?").format(path)
-            if not self.question(msg):
+            if not self.question(msg, icon=QMessageBox.Question):
                 return
             file_list = '\n'.join(self.storage.split_accounts())
             msg = _('Your accounts have been moved to') + ':\n' + file_list + '\n\n'+ _('Do you want to delete the old file') + ':\n' + path
-            if self.question(msg):
+            if self.question(msg, icon=QMessageBox.Warning):
                 os.remove(path)
                 self.show_warning(_('The file was removed'))
             return
@@ -263,7 +263,7 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
         if self.storage.requires_upgrade():
             self.hide()
             msg = _("The format of your wallet '%s' must be upgraded for Electron Radiant. This change will not be backward compatible"%path)
-            if not self.question(msg):
+            if not self.question(msg, icon=QMessageBox.Warning):
                 return
             self.storage.upgrade()
             self.wallet = Wallet(self.storage)
@@ -274,8 +274,8 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
             self.hide()
             msg = _("The file '{}' contains an incompletely created wallet.\n"
                     "Do you want to complete its creation now?").format(path)
-            if not self.question(msg):
-                if self.question(_("Do you want to delete '{}'?").format(path)):
+            if not self.question(msg, icon=QMessageBox.Question):
+                if self.question(_("Do you want to delete '{}'?").format(path), icon=QMessageBox.Warning):
                     os.remove(path)
                     self.show_warning(_('The file was removed'))
                 return

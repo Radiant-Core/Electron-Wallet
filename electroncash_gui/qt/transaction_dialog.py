@@ -303,7 +303,7 @@ class TxDialog(QDialog, MessageBoxMixin, PrintError):
 
     def closeEvent(self, event):
         if (self.prompt_if_unsaved and not self.saved
-                and not self.question(_('This transaction is not saved. Close anyway?'), title=_("Warning"))):
+                and not self.question(_('This transaction is not saved. Close anyway?'), title=_("Warning"), icon=QMessageBox.Warning)):
             event.ignore()
         else:
             super().closeEvent(event)

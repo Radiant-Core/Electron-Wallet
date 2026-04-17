@@ -161,9 +161,11 @@ class QtHandlerBase(QObject, PrintError):
         dialog.show()
 
     def error_dialog(self, msg):
+        self.clear_dialog()
         self.win.show_error(msg, parent=self.top_level_window())
 
     def warning_dialog(self, msg):
+        self.clear_dialog()
         self.win.show_warning(msg, parent=self.top_level_window())
         self.done.set()
 

@@ -928,8 +928,15 @@ class DeviceMgr(ThreadJob):
         devices = [dev for dev in devices if not self.xpub_by_id(dev.id_)]
         infos = []
         for device in devices:
-            if not device.product_key in plugin.DEVICE_IDS:
-                continue
+            if callable(getattr(plugin, 'can_recognize_device', None)):
+                if not plugin.can_recognize_device(device):
+                    continue
+            else:
+                try:
+                    if not device.product_key in plugin.DEVICE_IDS:
+                        continue
+                except AttributeError:
+                    continue
             client = self.create_client(device, handler, plugin)
             if not client:
                 continue

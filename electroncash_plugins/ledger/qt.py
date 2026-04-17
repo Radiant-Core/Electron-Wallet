@@ -1,4 +1,5 @@
 import threading
+from functools import partial
 
 from PyQt5.QtWidgets import QInputDialog, QLineEdit, QVBoxLayout, QLabel
 
@@ -7,6 +8,7 @@ from electroncash.plugins import hook
 from electroncash.wallet import Standard_Wallet
 from .ledger import LedgerPlugin
 from ..hw_wallet.qt import QtHandlerBase, QtPluginBase
+from ..hw_wallet.plugin import only_hook_if_libraries_available
 from electroncash_gui.qt.util import *
 
 class Plugin(LedgerPlugin, QtPluginBase):
@@ -17,14 +19,16 @@ class Plugin(LedgerPlugin, QtPluginBase):
         return Ledger_Handler(window)
 
     @hook
+    @only_hook_if_libraries_available
     def receive_menu(self, menu, addrs, wallet):
-        if type(wallet) is not Standard_Wallet:
+        if len(addrs) != 1:
             return
         keystore = wallet.get_keystore()
-        if type(keystore) == self.keystore_class and len(addrs) == 1:
-            def show_address():
-                keystore.thread.add(partial(self.show_address, wallet, addrs[0]))
-            menu.addAction(_("Show on Ledger"), show_address)
+        if not isinstance(keystore, self.keystore_class):
+            return
+        def show_address():
+            keystore.thread.add(partial(self.show_address, wallet, addrs[0]))
+        menu.addAction(_("Show on Ledger"), show_address)
 
 class Ledger_Handler(QtHandlerBase):
     setup_signal = pyqtSignal()
@@ -43,12 +47,16 @@ class Ledger_Handler(QtHandlerBase):
             self.word = str(response[0])
         self.done.set()
     
-    def message_dialog(self, msg):
+    def message_dialog(self, msg, on_cancel=None):
         self.clear_dialog()
-        self.dialog = dialog = WindowModalDialog(self.top_level_window(), _("Ledger Status"))
+        title = _("Please check your {} device").format(self.device)
+        self.dialog = dialog = WindowModalDialog(self.top_level_window(), title)
         l = QLabel(msg)
         vbox = QVBoxLayout(dialog)
         vbox.addWidget(l)
+        if on_cancel:
+            dialog.rejected.connect(on_cancel)
+            vbox.addLayout(Buttons(CancelButton(dialog)))
         dialog.show()
 
     def auth_dialog(self, data):
@@ -80,7 +88,8 @@ class Ledger_Handler(QtHandlerBase):
         dialog = WindowModalDialog(self.top_level_window(), _('Ledger Setup'))
         vbox = QVBoxLayout(dialog)
         vbox.addWidget(QLabel(
-            _('Please open the Bitcoin app on your Ledger device, then close this dialog.')
+            _('Please open the Bitcoin app on your Ledger device, then close this dialog.\n\n'
+              'Supported: Ledger Bitcoin app v1.x (Nano S) and v2.x+ (Nano X, Nano S Plus, Stax, Flex).')
         ))
         btn = QPushButton(_('Done'))
         btn.clicked.connect(dialog.accept)
