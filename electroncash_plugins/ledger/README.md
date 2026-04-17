@@ -1,76 +1,119 @@
-![Bitcoin Cash](https://raw.githubusercontent.com/The-Bitcoin-Cash-Fund/Branding/master/Bitcoin_Cash/BCH%20Logo%20Long%20Text%20WhiteBG.png "")
-# Using Electron-Cash with Ledger Nano S
+# Ledger Hardware Wallet Plugin for Electron Radiant
 
-Successfully tested with Ledger Nano S (1.3.1) Electron-Cash (3.1.2) and Bitcoin Cash Ledger App (1.1.5)
-
----
-
-### Official Links
-[Product Website](https://www.ledgerwallet.com/products/ledger-nano-s)
-
-##### Chrome Applications
-[Ledger Manager](https://chrome.google.com/webstore/detail/ledger-manager/beimhnaefocolcplfimocfiaiefpkgbf)
-[Leger Wallet Bitcoin](https://chrome.google.com/webstore/detail/ledger-wallet-bitcoin/kkdpmhnladdopljabkgpacgpliggeeaf)
-
-##### Guides
-[User Guide](https://ledger.zendesk.com/hc/en-us/sections/115001453109-Ledger-Nano-S)
-[Ledger Bitcoin Cash App User Guide](https://ledger.zendesk.com/hc/en-us/sections/115001472725-Bitcoin-Cash)
+Provides Ledger hardware wallet support for Electron Radiant.
 
 ---
 
-### Requirements
+## Status
 
-To complete a Bitcoin Cash transactions with a Ledger Nano S, you will need:
-
-1. An updated Ledger device - supported by Nano, HW.1, Nano S or Blue
-2. Bitcoin Cash app installed on your Ledger device
-3. "Browser Support" is disabled in the Bitcoin Cash Ledger app (only required for Nano S and/or Blue)
-
-PLEASE NOTE: Ensure that you do not have another application (like Electrum, Bitcoin Core, or any other software) opened on your computer
-
-(Use the Ledger Manager Chrome application to download and install the Bitcoin Cash app onto your Ledger device)
+The plugin supports:
+- ✅ Connecting a Ledger device to derive xpub and generate a watch-only wallet
+- ✅ Displaying receive addresses on the device
+- ✅ **Signing transactions** — requires the custom **Radiant Ledger app** (see below)
+- ❌ Signing with stock Bitcoin or Bitcoin Cash app (firmware incompatibility — see below)
 
 ---
 
-### Firmware
+## Technical Root Cause
 
-The latest Nano S firmware was released on March 2017 (Secure Element 1.3.1)
+### Radiant's Modified BIP143 Preimage
 
-It is strongly recommended to upgrade to the latest firmware. 
+Radiant uses a **modified BIP143** sighash preimage with an extra field not present in
+any standard Bitcoin or BCH app:
 
-To check which firmware version your Nano S is currently running, open the "Settings" application on your device and scroll until "Firmware" is displayed. 
-Press both buttons to enter the menu which displays your firmware version. 
+| Field | Standard BIP143 (BCH) | Radiant BIP143 |
+|---|---|---|
+| nVersion | ✅ | ✅ |
+| hashPrevouts | ✅ | ✅ |
+| hashSequence | ✅ | ✅ |
+| outpoint | ✅ | ✅ |
+| scriptCode | ✅ | ✅ |
+| value | ✅ | ✅ |
+| nSequence | ✅ | ✅ |
+| **hashOutputHashes** | ❌ absent | ✅ **extra field** |
+| hashOutputs | ✅ | ✅ |
+| nLocktime | ✅ | ✅ |
+| nHashType | ✅ | ✅ |
 
-Firmware Update Guide: https://ledger.zendesk.com/hc/en-us/articles/115005165409-How-can-I-update-my-Nano-S-
+`hashOutputHashes = SHA256d(concat of [amount(8) + SHA256d(script)(32) + zeros(36)] for each output)`
+
+### Why No Existing App Works
+
+The Ledger secure element computes the BIP143 sighash preimage **internally in firmware**.
+There is no APDU to inject extra fields or override the preimage structure. The BCH app's
+`startUntrustedTransaction` with `cashAddr=True` (p2=0x03) is the closest match for
+SIGHASH_FORKID, but it generates the standard BCH preimage (without `hashOutputHashes`),
+producing a different 32-byte digest than Radiant expects. The resulting signature is
+rejected with `mandatory-script-verify-flag-failed`.
+
+### Hash Algorithm
+
+- **Transaction sighash**: SHA256d (double SHA256) — same as Bitcoin/BCH ✅  
+- **Block headers only**: SHA512/256d — NOT used for tx signatures
 
 ---
 
-### Bitcoin Cash Ledger App
+## Supported Devices (Watch-Only)
 
-Install the Ledger Manager to download and install Bitcoin Cash application onto your Ledger device.
-
----
-
-### Using Ledger Nano S with Electron-Cash
-
-1. Connect your Ledger device to USB
-2. Enter your PIN code
-3. Open the Bitcoin Cash application on the Ledger (required for Nano S and Blue)
-4. Disable the "Browser support" setting in this application (required for Nano S and Blue)
-5. Launch Electron-Cash and start the new wallet wizard:
-    * Select "Use a Hardware Device" - press Next
-    * Select your Ledger device - press Next
-    * Select your desired Wallet Derivation (or leave default value for Bitcoin Cash)
-       - If you want to use legacy Bitcoin addresses use m/44'/0'/0'
-       - If you want to use Bitcoin Cash addresses use m/44'/145'/0'
-6. ???
-7. PROFIT!!! (Your Bitcoin wallet should now open in Electron-Cash)
+| Device | Recommended App | Purpose |
+|---|---|---|
+| Nano S (legacy) | Bitcoin Cash | xpub derivation + address display |
+| Nano X | Bitcoin Cash | xpub derivation + address display |
+| Nano S Plus | Bitcoin Cash | xpub derivation + address display |
+| Stax | Bitcoin Cash | xpub derivation + address display |
+| Flex | Bitcoin Cash | xpub derivation + address display |
 
 ---
 
-### Troubeshooting
+## Setup Instructions (Watch-Only Wallet)
 
-1. Uninstall and reinstall the Bitcoin Cash app on your Ledger device
-2. Try a different USB cable
-3. Try a different USB port 
-4. Try on another computer (see compatibility)
+1. Connect your Ledger via USB and enter your PIN.
+2. Open the **Bitcoin Cash** app on the device.
+3. Disable **"Browser support"** in app settings (Nano S / Blue only).
+4. Close Ledger Live and any other app using the device.
+5. In Electron Radiant: **New Wallet → Hardware Device → Ledger → derivation `m/44'/0'/0'`**.
+6. The wallet opens in watch-only mode. Addresses can be verified on-device.
+
+---
+
+## Custom Radiant Ledger App
+
+The custom **app-radiant** firmware is a fork of
+[`app-bitcoin-new`](https://github.com/LedgerHQ/app-bitcoin-new) with the following change:
+
+- `hashOutputHashes = SHA256d(∑ [amount(8) + SHA256d(script)(32) + zeros(36)])` is inserted
+  before `hashOutputs` in `compute_sighash_segwitv0()` when `SIGHASH_FORKID` (0x41) is set
+
+Source: `/Users/main/Downloads/app-radiant`
+
+To load onto a device (requires Ledger developer mode):
+```
+make COIN=radiant TARGET_NAME=TARGET_NANOSP load
+```
+
+> Once submitted to Ledger for signing, users can install it from the Ledger app store.
+
+---
+
+## Python Dependencies
+
+```
+pip install ledger_bitcoin[hid]   # required for device connection and xpub derivation
+```
+
+---
+
+## Official Resources
+
+- [Ledger Developer Portal](https://developers.ledger.com)
+- [ledger-bitcoin Python library](https://pypi.org/project/ledger-bitcoin/)
+- [app-bitcoin-new source](https://github.com/LedgerHQ/app-bitcoin-new)
+- [Radiant transaction.py serialize_preimage()](../../../electroncash/transaction.py)
+
+---
+
+## Troubleshooting
+
+- **Device not connecting**: Ensure Bitcoin Cash app is open and Browser support is disabled.
+- **"Signing not supported" error**: Expected — see above. Use a software wallet to sign.
+- **Device not recognised**: Ensure firmware is up to date via Ledger Live.
