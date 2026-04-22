@@ -9,7 +9,7 @@ from electroncash.bitcoin import TYPE_ADDRESS, TYPE_SCRIPT, int_to_hex, var_int
 from electroncash.i18n import _
 from electroncash.plugins import BasePlugin
 from electroncash.keystore import Hardware_KeyStore
-from electroncash.transaction import Transaction
+from electroncash.transaction import Transaction, InputValueMissing
 from ..hw_wallet import HW_PluginBase
 from ..hw_wallet.plugin import is_any_tx_output_on_change_branch, validate_op_return_output_and_get_data
 from electroncash.util import print_error, is_verbose, bfh, bh2u, versiontuple
@@ -536,16 +536,45 @@ class Ledger_Client_New:
             self.handler.show_message(_('Confirm Transaction on your {}...').format(self.device))
             input_sigs = self.client.sign_psbt(psbt, policy, wallet_hmac)
 
-            # --- Write signatures back into Electron's tx object ---
+            # --- Verify each signature locally before writing to the tx ---
+            # (B1 security fix) Recompute the Radiant sighash preimage from the
+            # wallet-side tx object and verify the device-returned DER signature
+            # against it.  Catches any firmware/wallet sighash divergence
+            # (hashOutputHashes mismatch, ref-sort drift, compromised firmware)
+            # before broadcast instead of producing a silently invalid tx.
+            from electroncash.bitcoin import Hash as _sha256d
             for sig_idx, part_sig in input_sigs:
                 txin = tx.inputs()[sig_idx]
                 signing_pos = signing_info[sig_idx][0]
                 sig_bytes = bytes(part_sig.signature)
                 # Device appends sighash byte 0x41; normalise in case it used 0x01
                 if sig_bytes and sig_bytes[-1] in (0x01, 0x41):
-                    sig_bytes = sig_bytes[:-1]
-                sig_bytes = sig_bytes + bytes([self.SIGHASH_FORKID])
-                txin['signatures'][signing_pos] = bh2u(sig_bytes)
+                    der_sig = sig_bytes[:-1]
+                else:
+                    der_sig = sig_bytes
+                sig_with_hashtype = der_sig + bytes([self.SIGHASH_FORKID])
+
+                # Recompute sighash preimage using the wallet's own tx object
+                try:
+                    preimage_hex = tx.serialize_preimage(sig_idx, self.SIGHASH_FORKID)
+                    msghash = _sha256d(bfh(preimage_hex))
+                    pubkey_hex = signing_info[sig_idx][2]
+                    pubkey_bytes = bfh(pubkey_hex) if isinstance(pubkey_hex, str) else pubkey_hex
+                    reasons = []
+                    if not Transaction.verify_signature(pubkey_bytes, der_sig, msghash,
+                                                        reason=reasons):
+                        why = '; '.join(reasons) if reasons else 'signature invalid'
+                        raise Exception(
+                            _('Ledger signature for input {idx} did not verify locally '
+                              'against the wallet-computed sighash (reason: {why}). '
+                              'The device signed a different message than the wallet '
+                              'built. DO NOT broadcast — this is a firmware or wallet '
+                              'bug and should be reported.').format(idx=sig_idx, why=why))
+                except InputValueMissing:
+                    # input value not cached; skip local verification for this input
+                    print_error(f"[Ledger] skipping local verify for input {sig_idx}: input value missing")
+
+                txin['signatures'][signing_pos] = bh2u(sig_with_hashtype)
 
             tx.raw = tx.serialize()
 
@@ -808,10 +837,16 @@ class Ledger_KeyStore(Hardware_KeyStore):
                     self.give_error(
                         _('Only address and script outputs are supported by {}').format(self.device))
                 if _type == TYPE_SCRIPT:
-                    try:
-                        validate_op_return_output_and_get_data(o, max_size=187, max_pushes=None)
-                    except RuntimeError as e:
-                        self.give_error('{}: {}'.format(self.device, str(e)))
+                    # (P5) Glyph FT/NFT outputs are TYPE_SCRIPT but are NOT
+                    # OP_RETURN: they are reference-prefixed P2PKH scripts.
+                    # Skip OP_RETURN validation for them; the Radiant firmware
+                    # accepts the 75-byte / 63-byte templates natively.
+                    from electroncash.glyph import GlyphFTOutput, GlyphNFTOutput
+                    if not isinstance(address, (GlyphFTOutput, GlyphNFTOutput)):
+                        try:
+                            validate_op_return_output_and_get_data(o, max_size=187, max_pushes=None)
+                        except RuntimeError as e:
+                            self.give_error('{}: {}'.format(self.device, str(e)))
                 info = tx.output_info.get(address)
                 if info is not None and len(tx.outputs()) > 1 and not has_change:
                     index, xpubs, m, script_type = info

@@ -102,6 +102,71 @@ def extract_ref_id(script_bytes):
     return bytes(script_bytes[1:1 + REF_DATA_SIZE])
 
 
+class GlyphOutput:
+    """Base class for typed Glyph output wrappers.
+
+    Glyph token outputs (FT, NFT) are TYPE_SCRIPT in Electron Cash because
+    their scriptPubKey is a reference-prefixed P2PKH — not a bare address and
+    not an OP_RETURN.  Code that classifies TYPE_SCRIPT outputs (e.g. the
+    Ledger signing plugin) must distinguish them from genuine OP_RETURN data
+    outputs to avoid running OP_RETURN validation against them.
+
+    Usage::
+
+        from electroncash.glyph import GlyphFTOutput, GlyphNFTOutput
+        if isinstance(address, (GlyphFTOutput, GlyphNFTOutput)):
+            # skip OP_RETURN validator; firmware handles these natively
+    """
+
+    __slots__ = ('script_bytes', 'ref_id')
+
+    def __init__(self, script_bytes: bytes):
+        self.script_bytes = script_bytes
+        self.ref_id = extract_ref_id(script_bytes)
+
+    def __repr__(self):
+        ref_hex = self.ref_id.hex() if self.ref_id else 'unknown'
+        return f'<{type(self).__name__} ref={ref_hex[:16]}…>'
+
+    def to_script_hex(self) -> str:
+        return self.script_bytes.hex()
+
+
+class GlyphFTOutput(GlyphOutput):
+    """Typed wrapper for a Glyph fungible-token (FT) output.
+
+    FT outputs carry a d0+36B OP_PUSHINPUTREF prefix followed by a standard
+    P2PKH script.  The ref is the token type identifier (the 36-byte tokenRef).
+    """
+
+
+class GlyphNFTOutput(GlyphOutput):
+    """Typed wrapper for a Glyph non-fungible-token (NFT) / singleton output.
+
+    NFT singleton outputs carry a d8+36B OP_REQUIREINPUTREF prefix (or a
+    d0+36B prefix for mint-authority scripts) followed by a standard P2PKH.
+    The ref is the unique token identity.
+    """
+
+
+def classify_glyph_output(script_bytes: bytes):
+    """Return a GlyphFTOutput, GlyphNFTOutput, or None for the given script.
+
+    Classification heuristic:
+    - Starts with OP_PUSHINPUTREF (0xd0)  → GlyphFTOutput
+    - Starts with OP_REQUIREINPUTREF (0xd8) → GlyphNFTOutput
+    - Otherwise → None (not a Glyph output, or malformed)
+    """
+    if not script_bytes or len(script_bytes) < 1 + REF_DATA_SIZE:
+        return None
+    opcode = script_bytes[0]
+    if opcode == OP_PUSHINPUTREF:
+        return GlyphFTOutput(script_bytes)
+    if opcode == OP_REQUIREINPUTREF:
+        return GlyphNFTOutput(script_bytes)
+    return None
+
+
 class WalletData(PrintError):
     """Tracks Glyph reference UTXOs in the wallet to prevent accidental
     spending. Mirrors the pattern used by slp.WalletData but much simpler
