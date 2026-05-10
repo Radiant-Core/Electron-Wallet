@@ -273,7 +273,8 @@ class BaseWizard(util.PrintError):
         message = '\n'.join([
             _('Enter your wallet derivation here.'),
             _('If you are not sure what this is, leave this field unchanged.'),
-            _("If you want the wallet to use legacy Bitcoin addresses use m/44'/0'/0'"),
+            _("Default: m/44'/512'/0' (Radiant Standard, SLIP-0044 coin type 512)"),
+            _("Legacy: m/44'/0'/0' (Bitcoin-compatible, coin type 0)"),
             _("The placeholder value of {} is the default derivation for {} wallets.").format(default_derivation, self.wallet_type),
         ])
         scannable = self.wallet_type == "standard" and bool(seed)

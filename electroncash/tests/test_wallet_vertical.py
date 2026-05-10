@@ -144,3 +144,49 @@ class TestWalletKeystoreAddressIntegrity(unittest.TestCase):
                          Address.from_string('3H3iyACDTLJGD2RMjwKZcCwpdYZLwEZzKb'))
         self.assertEqual(w.get_change_addresses()[0],
                          Address.from_string('31hyfHrkhNjiPZp1t7oky5CGNYqSqDAVM9'))
+
+    def test_bip44_derivation_coin_type_512(self):
+        """Test that bip44_derivation returns correct paths for Radiant (coin type 512)."""
+        # Test mainnet default (should use coin type 512)
+        with mock.patch('electroncash.networks.net.TESTNET', False):
+            result = keystore.bip44_derivation(0)
+            self.assertEqual(result, "m/44'/512'/0'")
+
+        # Test testnet (should use coin type 1)
+        with mock.patch('electroncash.networks.net.TESTNET', True):
+            result = keystore.bip44_derivation(0)
+            self.assertEqual(result, "m/44'/1'/0'")
+
+        # Test with explicit coin_type parameter
+        result = keystore.bip44_derivation(0, coin_type=512)
+        self.assertEqual(result, "m/44'/512'/0'")
+
+        result = keystore.bip44_derivation(0, coin_type=0)
+        self.assertEqual(result, "m/44'/0'/0'")
+
+        # Test with different account IDs
+        result = keystore.bip44_derivation(1, coin_type=512)
+        self.assertEqual(result, "m/44'/512'/1'")
+
+    @mock.patch.object(storage.WalletStorage, '_write')
+    def test_bip39_seed_bip44_radiant_standard(self, mock_write):
+        """Test BIP39 seed with Radiant Standard derivation path (m/44'/512'/0')."""
+        seed_words = 'treat dwarf wealth gasp brass outside high rent blood crowd make initial'
+
+        self.assertEqual(self.mnem.is_checksum_valid(seed_words), (True, True))
+
+        # Use Radiant Standard path with coin type 512
+        ks = keystore.from_seed(seed_words, '', seed_type='bip39', derivation="m/44'/512'/0'")
+
+        self.assertTrue(isinstance(ks, keystore.BIP32_KeyStore))
+
+        # Verify the xpub is different from the legacy coin type 0 path
+        self.assertNotEqual(ks.xpub, 'xpub6DFh1smUsyqmYD4obDX6ngaxhd53Zx7aeFjoobebm7vbkT6f9awJWFuGzBT9FQJEWFBL7UyhMXtYzRcwDuVbcxtv9Ce2W9eMm4KXLdvdbjv')
+
+        w = self._create_standard_wallet(ks)
+
+        # Verify receiving address is different from legacy path
+        receiving_addr = w.get_receiving_addresses()[0]
+        self.assertNotEqual(receiving_addr, Address.from_string('16j7Dqk3Z9DdTdBtHcCVLaNQy9MTgywUUo'))
+        # Address should be a valid P2PKH address
+        self.assertTrue(receiving_addr.is_p2pkh())

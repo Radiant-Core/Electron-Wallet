@@ -3076,6 +3076,20 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
         grid.addWidget(QLabel(wallet_type), 1, 1)
         grid.addWidget(QLabel(_("Script type")+ ':'), 2, 0)
         grid.addWidget(QLabel(self.wallet.txin_type), 2, 1)
+        # Add derivation path info for deterministic wallets
+        if self.wallet.is_deterministic():
+            keystores = self.wallet.get_keystores()
+            if keystores and keystores[0].has_derivation():
+                derivation = keystores[0].derivation
+                # Human-readable path label
+                if "44'/512'" in derivation:
+                    path_label = _("Radiant Standard (SLIP-0044)")
+                elif "44'/0'" in derivation:
+                    path_label = _("Legacy Bitcoin-compatible")
+                else:
+                    path_label = _("Custom")
+                grid.addWidget(QLabel(_("Derivation path")+ ':'), 3, 0)
+                grid.addWidget(QLabel(f"{derivation} ({path_label})"), 3, 1)
         vbox.addLayout(grid)
         if self.wallet.is_deterministic():
             mpk_text = ShowQRTextEdit()

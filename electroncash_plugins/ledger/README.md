@@ -14,7 +14,7 @@ The plugin supports:
 
 ### Signing Flow (app-radiant)
 Signing uses **PSBTv2** with `SIGHASH_FORKID|SIGHASH_ALL` (0x41) per input.
-The policy is `pkh(@0/**)` at `m/44'/0'/0'` (standard Radiant P2PKH path).
+The policy is `pkh(@0/**)` at `m/44'/512'/0'` (standard Radiant P2PKH path, SLIP-0044 coin type 512).
 
 ---
 
@@ -75,7 +75,7 @@ rejected with `mandatory-script-verify-flag-failed`.
 2. Open the **Bitcoin Cash** app on the device.
 3. Disable **"Browser support"** in app settings (Nano S / Blue only).
 4. Close Ledger Live and any other app using the device.
-5. In Electron Radiant: **New Wallet → Hardware Device → Ledger → derivation `m/44'/0'/0'`**.
+5. In Electron Radiant: **New Wallet → Hardware Device → Ledger → derivation `m/44'/512'/0'`**.
 6. The wallet opens in watch-only mode. Addresses can be verified on-device.
 
 ---

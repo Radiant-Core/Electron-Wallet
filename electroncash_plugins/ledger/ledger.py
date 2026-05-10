@@ -391,7 +391,7 @@ class Ledger_Client_New:
     def _get_singlesig_policy(self, bip32_path):
         """Build a pkh(@0/**) WalletPolicy for a standard BIP-44 P2PKH account path.
 
-        bip32_path must be the *account* root, e.g. "44'/0'/0'" (without m/).
+        bip32_path must be the *account* root, e.g. "44'/512'/0'" (without m/).
         """
         fpr = self.get_master_fingerprint()
         xpub = self.get_xpub('m/' + bip32_path, 'standard')
@@ -409,7 +409,7 @@ class Ledger_Client_New:
     def show_address(self, address_path, showOnScreen=True):
         """Display an address on the Ledger screen for user verification.
 
-        address_path: full path without leading "m/", e.g. "44'/0'/0'/0/3"
+        address_path: full path without leading "m/", e.g. "44'/512'/0'/0/3"
         """
         self.handler.show_message(_('Showing address on {}...').format(self.device))
         try:
@@ -442,7 +442,7 @@ class Ledger_Client_New:
         Constructs a PSBTv2 with SIGHASH_FORKID|SIGHASH_ALL (0x41) per input,
         sets witness_utxo (amount + scriptPubKey) and non_witness_utxo (full prev tx
         so the device can verify the txid), and uses a standard pkh(@0/**) wallet
-        policy matching Electron Wallet's m/44'/0'/0' derivation.
+        policy matching Electron Wallet's m/44'/512'/0' derivation.
 
         signing_info: list of (signing_pos, full_path, pubkey_hex, prev_tx_raw,
                                prevout_n, redeem_script_hex, sequence, amount)
@@ -501,7 +501,7 @@ class Ledger_Client_New:
                     prev_ctx.rehash()
                     psbt_in.non_witness_utxo = prev_ctx
 
-                # BIP-32 derivation path — full path e.g. "44'/0'/0'/0/3"
+                # BIP-32 derivation path — full path e.g. "44'/512'/0'/0/3"
                 path_parts = full_path.replace('h', "'").split('/')
                 int_path = []
                 for part in path_parts:
@@ -521,10 +521,10 @@ class Ledger_Client_New:
                 psbt_out.script = bfh(tx.pay_script(addr))
                 psbt.outputs.append(psbt_out)
 
-            # --- Wallet policy: pkh(@0/**) at the account path (m/44'/0'/0') ---
+            # --- Wallet policy: pkh(@0/**) at the account path (m/44'/512'/0') ---
             # Strip last 2 path components (change/index) to get account path.
-            first_path = signing_info[0][1]  # e.g. "44'/0'/0'/0/3"
-            account_path = '/'.join(first_path.split('/')[:-2])  # "44'/0'/0'"
+            first_path = signing_info[0][1]  # e.g. "44'/512'/0'/0/3"
+            account_path = '/'.join(first_path.split('/')[:-2])  # "44'/512'/0'"
             policy = self._get_singlesig_policy(account_path)
 
             print_error(f"[Ledger] policy={policy.descriptor_template} keys={policy.keys_info}")
@@ -1132,7 +1132,7 @@ class LedgerPlugin(HW_PluginBase):
         if client is None:
             raise OSError(_('Device id not found or was changed'))
         client.handler = self.create_handler(wizard)
-        client.get_xpub("m/44'/0'/0'", 'standard')  # BIP44 coin type 0
+        client.get_xpub("m/44'/512'/0'", 'standard')  # BIP44 coin type 512 (Radiant SLIP-0044)
 
     def get_xpub(self, device_id, derivation, xtype, wizard):
         devmgr = self.device_manager()

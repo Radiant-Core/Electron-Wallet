@@ -1,3 +1,11 @@
+# Release 3.0.0
+  * BIP44 SLIP-0044 Standard Derivation Paths - Coin type 512 (m/44'/512'/0'/0/x)
+    - New wallets now use the SLIP-0044 registered coin type for Radiant (512)
+    - Full backward compatibility with legacy coin type 0 wallets
+    - Added optional coin_type parameter to bip44_derivation() function
+    - Aligns with Radiant Core 3.0.0 derivation path standard
+  * Version bump to 3.0.0 for ecosystem alignment
+
 # Release 0.1.9
   * Fixed missing "Use a hardware device" option in wallet creation wizard
   * Ledger hardware wallet integration now properly accessible via Standard Wallet → Use a hardware device

@@ -741,9 +741,26 @@ is_private_key = lambda x: is_xprv(x) or is_private_key_list(x)
 is_bip32_key = lambda x: is_xprv(x) or is_xpub(x)
 
 
-def bip44_derivation(account_id):
-    bip  = 44
-    coin = 1 if networks.net.TESTNET else 0
+def bip44_derivation(account_id, coin_type=None):
+    """
+    Generate BIP44 derivation path for Radiant.
+    
+    Args:
+        account_id: The account index (e.g., 0 for first account)
+        coin_type: Optional coin type override. If None, auto-selects:
+                   - 512 for Radiant mainnet (SLIP-0044 registered)
+                   - 1 for testnet
+                   - 0 for legacy Bitcoin-compatible paths
+    
+    Returns:
+        Derivation path string like "m/44'/512'/0'"
+    """
+    bip = 44
+    if coin_type is not None:
+        coin = int(coin_type)
+    else:
+        # Default: SLIP-0044 registered coin type for Radiant
+        coin = 1 if networks.net.TESTNET else 512
     return "m/%d'/%d'/%d'" % (bip, coin, int(account_id))
 
 def bip39_normalize_passphrase(passphrase):

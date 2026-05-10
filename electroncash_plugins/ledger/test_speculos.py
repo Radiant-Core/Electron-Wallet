@@ -220,10 +220,10 @@ def test_psbt_signing():
     fpr_hex = fpr.hex()
     print(f"[2] Master fingerprint: {fpr_hex}")
 
-    # --- xpub at m/44'/0'/0' ---
+    # --- xpub at m/44'/512'/0' ---
     from ledger_bitcoin import WalletPolicy
-    xpub = client.get_extended_pubkey("m/44'/0'/0'")
-    print(f"[3] xpub (m/44'/0'/0'): {xpub}")
+    xpub = client.get_extended_pubkey("m/44'/512'/0'")
+    print(f"[3] xpub (m/44'/512'/0'): {xpub}")
 
     # --- Derive child pubkey /0/0 ---
     try:
@@ -247,7 +247,7 @@ def test_psbt_signing():
             sys.exit(1)
 
     pubkey_hex = pubkey_bytes.hex()
-    print(f"[4] Child pubkey (m/44'/0'/0'/0/0): {pubkey_hex}")
+    print(f"[4] Child pubkey (m/44'/512'/0'/0/0): {pubkey_hex}")
 
     # Derive P2PKH scriptPubKey: OP_DUP OP_HASH160 <hash160(pubkey)> OP_EQUALVERIFY OP_CHECKSIG
     h = hashlib.new("ripemd160")
@@ -304,8 +304,8 @@ def test_psbt_signing():
     prev_ctx.rehash()
     psbt_in.non_witness_utxo = prev_ctx
 
-    # BIP32 derivation: m/44'/0'/0'/0/0
-    int_path = [0x80000000 | 44, 0x80000000 | 0, 0x80000000 | 0, 0, 0]
+    # BIP32 derivation: m/44'/512'/0'/0/0
+    int_path = [0x80000000 | 44, 0x80000000 | 512, 0x80000000 | 0, 0, 0]
     psbt_in.hd_keypaths[pubkey_bytes] = KeyOriginInfo(fpr, int_path)
     psbt.inputs.append(psbt_in)
 
@@ -315,8 +315,8 @@ def test_psbt_signing():
     psbt_out.script = output_script
     psbt.outputs.append(psbt_out)
 
-    # --- Wallet policy: pkh(@0/**) at m/44'/0'/0' ---
-    key_info = f"[{fpr_hex}/44'/0'/0']{xpub}"
+    # --- Wallet policy: pkh(@0/**) at m/44'/512'/0' ---
+    key_info = f"[{fpr_hex}/44'/512'/0']{xpub}"
     policy = WalletPolicy(name="", descriptor_template="pkh(@0/**)", keys_info=[key_info])
     print(f"[6] Wallet policy: {policy.descriptor_template}")
     print(f"    Key: {key_info}")
