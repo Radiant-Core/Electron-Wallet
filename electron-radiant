@@ -39,6 +39,14 @@ if sys.platform == "win32" and hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS
 # implementation which does more intelligent things with protobuf namespaces
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 
+# cryptography >= 41 with OpenSSL 3.x fatally errors if the "legacy" provider
+# can't be loaded (e.g. missing/incompatible bundled legacy.dylib on macOS),
+# which kills the app silently before the GUI starts. Nothing in this wallet
+# needs legacy algorithms (ripemd160 has a pure-python fallback, stem only
+# uses modern primitives), so disable the provider requirement.
+# Must be set before `electroncash` (and transitively `cryptography`) is imported.
+os.environ.setdefault('CRYPTOGRAPHY_OPENSSL_NO_LEGACY', '1')
+
 if sys.version_info < (3, 6):
     sys.exit("*** Electron Radiant support for Python 3.5 has been discontinued.\n"
              "*** Please run Electron Radiant with Python 3.6 or above.")
