@@ -295,9 +295,22 @@ def get_address_from_output_script(_bytes):
     # note: we don't recognize bare multisigs.
 
     # Check for Radiant reference-prefixed scripts (Glyph tokens).
-    # These have OP_PUSHINPUTREF/OP_REQUIREINPUTREF opcodes prepended to
-    # a standard locking script. Strip the references and try to extract
-    # the inner address so the wallet can track these UTXOs.
+    # Precise shape classifier first (exact byte match, backed by 24
+    # golden vectors): NFT singletons (63B d8-prefix) and FT holders
+    # (75B with P2PKH prologue + FT conservation epilogue). Both resolve
+    # to a normal P2PKH address — the wallet can display, select, and
+    # sign them using the existing P2PKH code paths.
+    glyph_match = glyph_mod.classify_glyph_output(_bytes)
+    if glyph_match is not None:
+        _kind, pkh_bytes, _ref_bytes = glyph_match
+        return TYPE_ADDRESS, Address.from_P2PKH_hash(pkh_bytes)
+
+    # Fallback for scripts that begin with a ref opcode but don't match
+    # the exact NFT/FT templates (e.g. 241-byte FT mint-authority output,
+    # dMint control scripts, other future shapes). Strip the ref prefix
+    # and see if the remainder is standard P2PKH/P2SH — better than a
+    # bare TYPE_SCRIPT for UX, but these are typically not user-spendable
+    # and WalletData will flag them via has_radiant_refs().
     if glyph_mod.has_radiant_refs(_bytes):
         inner = glyph_mod.strip_radiant_refs(_bytes)
         if inner is not None:
