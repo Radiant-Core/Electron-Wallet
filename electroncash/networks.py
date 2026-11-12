@@ -49,20 +49,20 @@ class MainNet(AbstractNet):
     WIF_PREFIX = 0x80
     ADDRTYPE_P2PKH = 0
     ADDRTYPE_P2SH = 5
-    CASHADDR_PREFIX = "bitcoincash"
+    CASHADDR_PREFIX = "radaddr"
     RPA_PREFIX = "paycode"
-    HEADERS_URL = "http://bitcoincash.com/files/blockchain_headers"  # Unused
-    GENESIS = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
-    DEFAULT_PORTS = {'t': '50001', 's': '50002'}
+    GENESIS = "0000000065d8ed5d8be28d6876b3ffb660ac2a6c0ca59e437e1f7a6f4e003fb4"
+    DEFAULT_PORTS = {'t': '50010', 's': '50012'}
     DEFAULT_SERVERS = _read_json_dict('servers.json')  # DO NOT MODIFY IN CLIENT CODE
     TITLE = 'Electron Radiant'
 
-    # Bitcoin Cash fork block specification
-    BITCOIN_CASH_FORK_BLOCK_HEIGHT = 478559
-    BITCOIN_CASH_FORK_BLOCK_HASH = "000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec"
-
-    # Nov 13. 2017 HF to CW144 DAA height (height of last block mined on old DAA)
-    CW144_HEIGHT = 504031
+    # Chain checkpoint: a header batch containing this height must carry this
+    # exact block hash, or the chain is rejected (guards against wrong-chain
+    # servers). Anchored at the Radiant SecurityUpgrade activation block
+    # (chainparams.cpp SecurityUpgradeHeight). Update to a recent height when
+    # cutting a new release.
+    CHECKPOINT_BLOCK_HEIGHT = 440000
+    CHECKPOINT_BLOCK_HASH = "000000000000003a98a037202d92e71981aba4ab80a80b9b407a377a36059e0f"
 
     # Note: this is not the Merkle root of the verification block itself , but a Merkle root of
     # all blockchain headers up until and including this block. To get this value you need to
@@ -99,24 +99,21 @@ class TestNet(AbstractNet):
     WIF_PREFIX = 0xef
     ADDRTYPE_P2PKH = 111
     ADDRTYPE_P2SH = 196
-    CASHADDR_PREFIX = "bchtest"
+    CASHADDR_PREFIX = "radtest"
     RPA_PREFIX = "paycodetest"
-    HEADERS_URL = "http://bitcoincash.com/files/testnet_headers"  # Unused
-    GENESIS = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
-    DEFAULT_PORTS = {'t':'51001', 's':'51002'}
+    GENESIS = "000000000d8ada264d16f87a590b2af320cd3c7e3f9be5482163e830fd00aca2"
+    DEFAULT_PORTS = {'t':'51010', 's':'51012'}
     DEFAULT_SERVERS = _read_json_dict('servers_testnet.json')  # DO NOT MODIFY IN CLIENT CODE
     TITLE = 'Electron Radiant Testnet'
     BASE_UNITS = {'tRXD': 8, 'mtRXD': 5, 'tbits': 2}
     DEFAULT_UNIT = "tRXD"
 
-    # Nov 13. 2017 HF to CW144 DAA height (height of last block mined on old DAA)
-    CW144_HEIGHT = 1188697
+    # No trusted checkpoint anchor for the Radiant testnet yet; the check is
+    # skipped while the height is None.
+    CHECKPOINT_BLOCK_HEIGHT = None
+    CHECKPOINT_BLOCK_HASH = None
 
-    # Bitcoin Cash fork block specification
-    BITCOIN_CASH_FORK_BLOCK_HEIGHT = 1155876
-    BITCOIN_CASH_FORK_BLOCK_HASH = "00000000000e38fef93ed9582a7df43815d5c2ba9fd37ef70c9a0ea4a285b8f5"
-
-    VERIFICATION_BLOCK_MERKLE_ROOT = "b09cbd1d549118c26c8be8734beba50714847b29f78f29f4c03393ffb62e6c2a"
+    VERIFICATION_BLOCK_MERKLE_ROOT = None  # TODO: pin a trusted root; the BCH-inherited value was removed
     VERIFICATION_BLOCK_HEIGHT = 32000
     asert_daa = ASERTDaa(is_testnet=True)
     asert_daa.anchor = Anchor(height=33000, bits=453224288, prev_time=1657404650)
@@ -132,46 +129,20 @@ class TestNet(AbstractNet):
     }
 
 
-class TestNet4(TestNet):
-    GENESIS = "000000001dd410c49a788668ce26751718cc797474d3152a5fc073dd44fd9f7b"
-    TITLE = 'Electron Cash Testnet4'
-
-    HEADERS_URL = "http://bitcoincash.com/files/testnet4_headers"  # Unused
-
-    DEFAULT_SERVERS = _read_json_dict('servers_testnet4.json')  # DO NOT MODIFY IN CLIENT CODE
-    DEFAULT_PORTS = {'t': '62001', 's': '62002'}
-
-    BITCOIN_CASH_FORK_BLOCK_HEIGHT = 6
-    BITCOIN_CASH_FORK_BLOCK_HASH = "00000000d71b9b1f7e13b0c9b218a12df6526c1bcd1b667764b8693ae9a413cb"
-
-    # Nov 13. 2017 HF to CW144 DAA height (height of last block mined on old DAA)
-    CW144_HEIGHT = 3000
-
-    VERIFICATION_BLOCK_MERKLE_ROOT = "e4cd956daecf2a1d2894954bb479f09e6d2d488e470ed59e1af6a329170597d6"
-    VERIFICATION_BLOCK_HEIGHT = 68611
-    asert_daa = ASERTDaa(is_testnet=True)  # Redeclare to get instance for this subclass
-    asert_daa.anchor = Anchor(height=16844, bits=453224288, prev_time=1657404650)
-
-
 class ScaleNet(TestNet):
-    GENESIS = "00000000e6453dc2dfe1ffa19023f86002eb11dbb8e87d0291a4599f0430be52"
-    TITLE = 'Electron Cash Scalenet'
+    GENESIS = "00000000ea7340a6e9ae28ad8ca95a652c8da00ee7ea97e6cb42cd1558884c87"
+    TITLE = 'Electron Radiant Scalenet'
     BASE_UNITS = {'sRXD': 8, 'msRXD': 5, 'sbits': 2}
     DEFAULT_UNIT = "tRXD"
 
 
-    HEADERS_URL = "http://bitcoincash.com/files/scalenet_headers"  # Unused
-
     DEFAULT_SERVERS = _read_json_dict('servers_scalenet.json')  # DO NOT MODIFY IN CLIENT CODE
     DEFAULT_PORTS = {'t': '63001', 's': '63002'}
 
-    BITCOIN_CASH_FORK_BLOCK_HEIGHT = 6
-    BITCOIN_CASH_FORK_BLOCK_HASH = "000000000e16730d293050fc5fe5b0978b858f5d9d91192a5ca2793902493597"
+    CHECKPOINT_BLOCK_HEIGHT = None
+    CHECKPOINT_BLOCK_HASH = None
 
-    # Nov 13. 2017 HF to CW144 DAA height (height of last block mined on old DAA)
-    CW144_HEIGHT = 3000
-
-    VERIFICATION_BLOCK_MERKLE_ROOT = "41eb32849a353fcb408c8b25e84578c714dbdc5ee774d0fbe25e85755250df6a"
+    VERIFICATION_BLOCK_MERKLE_ROOT = None
     VERIFICATION_BLOCK_HEIGHT = 2016
     asert_daa = ASERTDaa(is_testnet=False)  # Despite being a "testnet", ScaleNet uses 2d half-life
     asert_daa.anchor = None  # Intentionally not specified because it's after checkpoint; blockchain.py will calculate
@@ -197,12 +168,6 @@ def set_mainnet():
 def set_testnet():
     global net
     net = TestNet
-    _set_units()
-
-
-def set_testnet4():
-    global net
-    net = TestNet4
     _set_units()
 
 

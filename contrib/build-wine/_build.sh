@@ -14,6 +14,10 @@ export GIT_SUBMODULE_FLAGS="--recommend-shallow --depth 1"
 
 . "$here"/../base.sh # functions we use below (fail, et al)
 
+# Python 3.8.11+ ship no win32 installers at all (source-only); the
+# per-component MSIs this build installs end at 3.8.10.
+export PYTHON_VERSION=3.8.10
+
 if [ ! -z "$1" ]; then
     to_build="$1"
 else
@@ -59,7 +63,7 @@ prepare_wine() {
         PYINSTALLER_COMMIT=d6f3d02365ba68ffc84169c56c292701f346110e # Version 4.2 + a patch to drop an unused .rc file
 
         ## These settings probably don't need change
-        PYHOME=c:/python$PYTHON_VERSION  # NB: PYTON_VERSION comes from ../base.sh
+        PYHOME=c:/python$PYTHON_VERSION
         PYTHON="wine $PYHOME/python.exe -OO -B"
 
         info "Cleaning tmp"
@@ -90,12 +94,12 @@ prepare_wine() {
         done
 
         $SHA256_PROG -c - << EOF
-934eda542020cb5ba6de16f5c150e7571a25dd3cb9f3832eb8b2cb54c7331aa6 core.msi
-58e517f0bb55fbf9ba1d9ec6a17a5420959469001ec1945c6c56dbbe566d3056 dev.msi
-34594d5522b0939b50edfdb01a980589f559fc659ce1f20288d297dda0905630 exe.msi
-fcd8bd0ead0a67906f39e99e557d66e71bc6810bd4916d03c2c5341ff95992bf lib.msi
-8d8159fdb9f42b81e9206bf7be0c2b034b3df717d58cfb484c0b3fb8ec3cab6a pip.msi
-ca8ef45591b07e7dbcc9b4b7b1c4d6528d3f0349fdf6779c71312bd9c3187801 tools.msi
+b14d133ff51b345acc0e903d6021f1699ca3106841cd5abf0da9d972f0d44e40 core.msi
+5fee9fd4ebde2201adcbdeb5d61a82fd9af4243614363a72ab520bba7f0a4217 dev.msi
+f3148043f1d6d39935227540abcfc18cec8f1fb064ab4e647789242a14a8b77a exe.msi
+bd130fe0a976d293b0d97c41d1098b5b69bc4998bb8f713a6e82b2844b18b262 lib.msi
+529dd0c991f08127c39122b18f2670302740d663ffae1c556259b94775fc261c pip.msi
+bcf87f3d3048390c1e3704e789520b27046e1dd144e119f24b3bd375f46928d4 tools.msi
 EOF
         test $? -eq 0 || fail "Failed to verify Python checksums"
 
@@ -226,8 +230,15 @@ build_the_app() {
         # Install frozen dependencies
         info "Installing frozen dependencies ..."
         $PYTHON -m pip install --no-deps --no-warn-script-location -r "$here"/../deterministic-build/requirements.txt || fail "Failed to install requirements"
-        $PYTHON -m pip install --no-deps --no-warn-script-location -r "$here"/../deterministic-build/requirements-hw.txt || fail "Failed to install requirements-hw"
-        $PYTHON -m pip install --no-deps --no-warn-script-location -r "$here"/../deterministic-build/requirements-web3.txt || fail "Failed to install requirements-web3"
+        # pyscard's sdist must run swig and compile against MSVC, which the
+        # VS Build Tools step used to provide. Drop it on Windows: Satochip
+        # support won't ship there, but Trezor/Ledger/KeepKey still will.
+        grep -v -e "pyscard" -e "pysatochip" "$here"/../deterministic-build/requirements-hw.txt > /tmp/electron-radiant-hw-reqs.txt
+        $PYTHON -m pip install --no-deps --no-warn-script-location -r /tmp/electron-radiant-hw-reqs.txt || fail "Failed to install requirements-hw"
+        # cytoolz and bitarray only ship as sdists and need MSVC; the only
+        # consumer (lns.py) is hard-disabled upstream anyway.
+        grep -v -e "cytoolz" -e "bitarray" "$here"/../deterministic-build/requirements-web3.txt > /tmp/electron-radiant-web3-reqs.txt
+        $PYTHON -m pip install --no-deps --no-warn-script-location -r /tmp/electron-radiant-web3-reqs.txt || fail "Failed to install requirements-web3"
 
         pushd "$WINEPREFIX"/drive_c/electronradiant
         $PYTHON setup.py install || fail "Failed setup.py install"

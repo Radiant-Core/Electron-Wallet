@@ -542,12 +542,11 @@ class Info(namedtuple("Info", "name, address, number, collision_hash, emoji, txi
         return cls.from_script(regtx.script, regtx.txid)
 
 
-servers = [
-    "https://cashacct.imaginary.cash",  # Runs official 'cash-accounts' lookup server software
-    "https://api.cashaccount.info",     # Runs official 'cash-accounts' lookup server software
-    "https://cashacct.electroncash.dk", # Runs official 'cash-accounts' lookup server software
-    "https://electrum.imaginary.cash"   # Runs alternative server software: https://gitlab.com/paOol/lookup-server
-]
+# Cash Account lookup services are all Bitcoin Cash infrastructure and do not
+# index the Radiant chain; the list is intentionally empty so lookups fail fast
+# rather than querying dead endpoints. The remaining cashacct UI is inert and
+# should be removed in a future cleanup.
+servers = []
 
 debug = False  # network debug setting. Set to True when developing to see more verbose information about network operations.
 timeout = 12.5  # default timeout used in various network functions, in seconds.

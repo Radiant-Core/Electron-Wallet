@@ -812,7 +812,7 @@ class ElectrumGui(QObject, PrintError):
             <p>
             {url_blurb}
             </p>
-            <p><a href="{url}">Electron Cash Secp Mini-HOWTO</a></p>
+            <p><a href="{url}">libsecp256k1 Mini-HOWTO</a></p>
         </body></html>
         '''
         msg = template.format(

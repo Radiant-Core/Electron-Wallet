@@ -51,6 +51,7 @@ overlay_local_fixes() {
                 mkdir -p "$dst_root/$rel" || fail "Failed to prepare dir overlay target for $rel"
                 if [ -d "$src_root/$rel/.git" ] || [ -f "$src_root/$rel/.git" ]; then
                     (cd "$src_root/$rel" && git archive --format=tar HEAD) | (cd "$dst_root/$rel" && tar -xf -) || fail "Failed to overlay git dir $rel"
+                    echo "overlay $rel: $(ls "$dst_root/$rel" | wc -l) files" >&2
                 else
                     cp -a "$src_root/$rel/." "$dst_root/$rel/" || fail "Failed to overlay dir $rel"
                 fi
@@ -109,7 +110,8 @@ FRESH_CLONE_DIR=$FRESH_CLONE/$GIT_DIR_NAME
         cd $FRESH_CLONE  && \
         git clone "$SOURCE_ROOT" $GIT_DIR_NAME && \
         cd $GIT_DIR_NAME && \
-        git checkout $REV
+        git checkout $REV && \
+        git submodule update --init
 ) || fail "Could not create a fresh clone from git"
 
 overlay_local_fixes "$SOURCE_ROOT" "$FRESH_CLONE_DIR"

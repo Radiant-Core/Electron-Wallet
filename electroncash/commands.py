@@ -429,7 +429,7 @@ class Commands:
 
     @command('')
     def version(self):
-        """Return the version of Electron Cash."""
+        """Return the version of Electron Radiant."""
         from .version import PACKAGE_VERSION
         return PACKAGE_VERSION
 
@@ -1001,13 +1001,12 @@ def add_network_options(parser):
 def add_global_options(parser):
     group = parser.add_argument_group('global options')
     group.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False, help="Show debugging information")
-    group.add_argument("-D", "--dir", dest="electron_cash_path", help="electron cash directory")
+    group.add_argument("-D", "--dir", dest="electron_cash_path", help="electron radiant directory")
     group.add_argument("-P", "--portable", action="store_true", dest="portable", default=False, help="Use local 'electron_cash_data' directory")
     group.add_argument("-w", "--wallet", dest="wallet_path", help="wallet path")
     group.add_argument("-wp", "--walletpassword", dest="wallet_password", default=None, help="Supply wallet password")
     group.add_argument("--forgetconfig", action="store_true", dest="forget_config", default=False, help="Forget config on exit")
     group.add_argument("--testnet", action="store_true", dest="testnet", default=False, help="Use Testnet")
-    group.add_argument("--testnet4", action="store_true", dest="testnet4", default=False, help="Use Testnet4")
     group.add_argument("--scalenet", action="store_true", dest="scalenet", default=False, help="Use Scalenet")
 
 def get_parser():
@@ -1017,7 +1016,7 @@ def get_parser():
     add_global_options(parser)
     subparsers = parser.add_subparsers(dest='cmd', metavar='<command>')
     # gui
-    parser_gui = subparsers.add_parser('gui', description="Run Electron Cash's Graphical User Interface.", help="Run GUI (default)")
+    parser_gui = subparsers.add_parser('gui', description="Run Electron Radiant's Graphical User Interface.", help="Run GUI (default)")
     parser_gui.add_argument("url", nargs='?', default=None, help="bitcoin URI (or bip70 file)")
     parser_gui.add_argument("-g", "--gui", dest="gui", help="select graphical user interface", choices=['qt', 'text', 'stdio'])
     parser_gui.add_argument("-o", "--offline", action="store_true", dest="offline", default=False, help="Run offline")

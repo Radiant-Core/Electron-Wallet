@@ -189,4 +189,4 @@ class TestWalletKeystoreAddressIntegrity(unittest.TestCase):
         receiving_addr = w.get_receiving_addresses()[0]
         self.assertNotEqual(receiving_addr, Address.from_string('16j7Dqk3Z9DdTdBtHcCVLaNQy9MTgywUUo'))
         # Address should be a valid P2PKH address
-        self.assertTrue(receiving_addr.is_p2pkh())
+        self.assertTrue(receiving_addr.kind == Address.ADDR_P2PKH)

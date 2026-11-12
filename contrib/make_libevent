@@ -10,6 +10,18 @@ info "Building $pkgname..."
 
 pushd "$here"/$pkgname || fail "Could not chdir to $here/$pkgname"
 openssl_prefix="$here/openssl/dist"
+if [ ! -d "$openssl_prefix" ]; then
+    # The contrib openssl submodule is no longer shipped; fall back to a
+    # system/Homebrew OpenSSL so libevent still gets SSL support.
+    for candidate in /opt/homebrew/opt/openssl@3 /usr/local/opt/openssl@3 \
+                     /opt/homebrew/opt/openssl@1.1 /usr/local/opt/openssl@1.1 \
+                     /usr ; do
+        if [ -d "$candidate/include/openssl" ] || [ -f "$candidate/include/openssl/ssl.h" ]; then
+            openssl_prefix="$candidate"
+            break
+        fi
+    done
+fi
 openssl_include="$openssl_prefix/include"
 openssl_lib="$openssl_prefix/lib"
 if ! [ -x configure ] ; then
@@ -18,6 +30,11 @@ fi
 # Force reconfigure on Darwin/macOS to prevent stale Linux configuration
 if [ "$BUILD_TYPE" = "darwin" ] ; then
     rm -f config.status
+fi
+if [ "$BUILD_TYPE" = "wine" ] ; then
+    # evutil_inet_pton_scope calls if_nametoindex, which lives in iphlpapi
+    # on Windows, and nothing here links it. Numeric %scope still works.
+    sed -i.bak 's/^\tif_index = if_nametoindex(scope + 1);/\t#ifdef _WIN32\n\t\tif_index = 0;\n\t#else\n\t\tif_index = if_nametoindex(scope + 1);\n\t#endif/' evutil.c && rm -f evutil.c.bak
 fi
 if ! [ -r config.status ] ; then
     ./configure \

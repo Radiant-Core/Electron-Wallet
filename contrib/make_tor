@@ -60,6 +60,26 @@ else
     info "Using system OpenSSL (auto-detected by configure)"
 fi
 
+if [ "$BUILD_TYPE" = "wine" ] ; then
+    # The OpenSSL function probes link a test program against the static
+    # libcrypto, which needs winsock libs configure never adds, so every
+    # probe reports "no" and tor compiles 1.0 compat shims that clash with
+    # the real 1.1.1 headers. These functions all exist in OpenSSL 1.1.1.
+    export ac_cv_func_EVP_PBE_scrypt=yes
+    export ac_cv_func_EVP_sha3_256=yes
+    export ac_cv_func_SSL_CIPHER_find=yes
+    export ac_cv_func_SSL_CTX_set1_groups_list=yes
+    export ac_cv_func_SSL_CTX_set_security_level=yes
+    export ac_cv_func_SSL_SESSION_get_master_key=yes
+    export ac_cv_func_SSL_get_client_ciphers=yes
+    export ac_cv_func_SSL_get_client_random=yes
+    export ac_cv_func_SSL_get_server_random=yes
+    export ac_cv_func_TLS_method=yes
+fi
+
+# autoconf 2.7x removed AC_PROG_CC_C99; AC_PROG_CC is the modern equivalent.
+sed -i.bak 's/AC_PROG_CC_C99/AC_PROG_CC/g' configure.ac && rm -f configure.ac.bak
+
 if ! [ -x configure ] ; then
     ./autogen.sh || fail "Could not configure $pkgname"
 fi

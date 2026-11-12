@@ -165,6 +165,8 @@ rm -rf ./dist
 info "Skipping locale generation (using existing locale files)..."
 # python3 ./contrib/make_locale || fail "Failed to make locale..."
 # Locale files already exist in contrib/electrum-locale/locale submodule
+mkdir -p electroncash/locale
+cp -R contrib/electrum-locale/locale/. electroncash/locale/ || fail "Could not copy locale files"
 
 info "Downloading libusb..."
 curl -L https://github.com/cculianu/Electron-Cash-Build-Tools/releases/download/v1.0/libusb-1.0.21.el_capitan.bottle.tar.gz | \
@@ -195,6 +197,12 @@ popd
 cp -fp contrib/secp256k1/.libs/libsecp256k1.0.dylib contrib/osx || fail "Could not copy secp256k1 binary to its destination"
 
 info "Building integrated Tor"
+# Patch tor for modern toolchain compat (autoconf 2.7x removed AC_PROG_CC_C99;
+# OpenSSL 3 makes SSL_OP_* macros unusable in #if). Applied in-tree; the dirty
+# submodule is fine because VERSION was already captured above.
+sed -i '' 's/AC_PROG_CC_C99/AC_PROG_CC/g' contrib/tor/configure.ac
+sed -i '' -e 's/ && \\$//' -e '/^  SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION != 0$/d' \
+    contrib/tor/src/lib/tls/tortls_openssl.c
 # Use system OpenSSL instead of building custom one to avoid CMAC compatibility issues with cryptography package
 contrib/make_zlib && contrib/make_libevent && contrib/make_tor || fail "Could not build Tor"
 
@@ -220,7 +228,11 @@ python3 -m pip install -r ./contrib/deterministic-build/requirements-binaries.tx
 python3 -m pip install --no-deps --no-warn-script-location -r ./contrib/deterministic-build/requirements-web3.txt --user || fail "Could not install web3 requirements"
 
 info "Installing hardware wallet requirements..."
-python3 -m pip install -r ./contrib/deterministic-build/requirements-hw.txt --user || \
+# pyscard's sdist must run swig, and modern swig (4.2+) generates a broken
+# wrapper for it. Drop it on macOS: Satochip support won't ship there, but
+# Trezor/Ledger/KeepKey still will.
+grep -v -e "pyscard" -e "pysatochip" ./contrib/deterministic-build/requirements-hw.txt > /tmp/electron-radiant-hw-reqs.txt
+python3 -m pip install -r /tmp/electron-radiant-hw-reqs.txt --user || \
 fail "Could not install hardware wallet requirements"
 
 info "Building $PACKAGE..."
@@ -229,29 +241,23 @@ python3 setup.py install --user > /dev/null || fail "Could not build $PACKAGE"
 info "Building binary"
 EC_PACKAGE_VERSION="$VERSION" pyinstaller --clean --noconfirm --ascii contrib/osx/osx.spec || fail "Could not build binary"
 
-info "Adding bitcoincash & cashacct URI types to Info.plist"
+info "Adding radaddr URI type to Info.plist"
 # NB: Make sure there are no trailing spaces after the '\' characters here
 plutil -insert 'CFBundleURLTypes' \
 	-xml \
 '<array> '\
 '<dict> '\
 '  <key>CFBundleURLName</key> '\
-'  <string>bitcoincash</string> '\
+'  <string>radaddr</string> '\
 '  <key>CFBundleURLSchemes</key> '\
-'    <array><string>bitcoincash</string></array> '\
-'</dict> '\
-'<dict> '\
-'  <key>CFBundleURLName</key> '\
-'  <string>CashAccount</string> '\
-'  <key>CFBundleURLSchemes</key> '\
-'    <array><string>cashacct</string></array> '\
+'    <array><string>radaddr</string></array> '\
 '</dict> '\
 '</array>' \
 	-- dist/$PACKAGE.app/Contents/Info.plist \
 	|| fail "Could not add keys to Info.plist. Make sure the program 'plutil' exists and is installed."
 
 plutil -insert 'NSCameraUsageDescription' \
-       -string 'Electron Cash would like to access the camera to scan for QR codes' \
+       -string 'Electron Radiant would like to access the camera to scan for QR codes' \
 	-- dist/$PACKAGE.app/Contents/Info.plist \
 	|| fail "Could not add keys to Info.plist. Make sure the program 'plutil' exists and is installed."
 

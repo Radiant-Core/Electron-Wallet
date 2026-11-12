@@ -63,11 +63,11 @@ class UpdateChecker(QWidget, PrintError):
     _dl_prog = pyqtSignal(object, int) # [0 -> 100] range
 
     #url = "https://www.c3-soft.com/downloads/BitcoinCash/Electron-Cash/update_check" # Testing URL
-    url = "https://raw.githubusercontent.com/Radiant-Core/Electron-Wallet/master/contrib/update_checker/releases.json" # Release URL
+    url = "https://raw.githubusercontent.com/Radiant-Core/Electron-Wallet/main/contrib/update_checker/releases.json" # Release URL
     download_url = "https://github.com/Radiant-Core/Electron-Wallet/releases"
 
     VERSION_ANNOUNCEMENT_SIGNING_ADDRESSES = (
-        address.Address.from_string("135Q31U2w7cwE8VAStwsAe57DrnLiB4W6w", net=MainNet), # 3untz's key
+        address.Address.from_string("1GCrbcJHMNHNfzB7Nmdw5znmHm9ytfmPw8", net=MainNet), # Radiant release-signing key (maintainer-held, generated 2026-11-12)
     )
 
     def __init__(self, parent=None):

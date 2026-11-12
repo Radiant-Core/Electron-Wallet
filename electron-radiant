@@ -4,7 +4,7 @@
 # Electrum - lightweight Bitcoin client
 # Copyright (C) 2011 thomasv@gitorious
 #
-# Electron Cash - lightweight Bitcoin Cash client
+# Electron Radiant - lightweight Radiant client
 # Copyright (C) 2017-2020 The Electron Cash Developers
 #
 # Permission is hereby granted, free of charge, to any person
@@ -354,7 +354,7 @@ def init_plugins(config, gui_name):
 
 
 def run_gui(config, config_options):
-    """Run Electron Cash with GUI"""
+    """Run Electron Radiant with GUI"""
     file_desc, server = daemon.get_fd_or_server(config)
     if file_desc is not None:
         plugins = init_plugins(config, config.get("gui", "qt"))
@@ -370,7 +370,7 @@ def run_gui(config, config_options):
 
 
 def run_start(config, config_options, subcommand):
-    """Start Electron Cash"""
+    """Start Electron Radiant"""
     file_desc, server = daemon.get_fd_or_server(config)
     if file_desc is not None:
         if subcommand == "start":
@@ -422,7 +422,7 @@ def run_daemon(config, config_options):
 
 
 def run_cmdline(config, config_options, cmdname):
-    """Run Electron Cash in command line mode"""
+    """Run Electron Radiant in command line mode"""
     server = daemon.get_server(config)
     init_cmdline(config_options, server)
     if server is not None:
@@ -474,16 +474,13 @@ def process_config_options(args):
     set_verbosity(config_options.get("verbose"))
 
     have_testnet = config_options.get("testnet", False)
-    have_testnet4 = config_options.get("testnet4", False)
     have_scalenet = config_options.get("scalenet", False)
-    if have_testnet + have_testnet4 + have_scalenet > 1:
+    if have_testnet + have_scalenet > 1:
         sys.exit(
-            "Invalid combination of --testnet, --testnet4, and/or --scalenet"
+            "Invalid combination of --testnet and/or --scalenet"
         )
     elif have_testnet:
         networks.set_testnet()
-    elif have_testnet4:
-        networks.set_testnet4()
     elif have_scalenet:
         networks.set_scalenet()
 

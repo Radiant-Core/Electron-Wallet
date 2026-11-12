@@ -74,7 +74,8 @@ FRESH_CLONE_DIR="$FRESH_CLONE/$GIT_DIR_NAME"
         cd "$FRESH_CLONE"  && \
         git clone "$GIT_REPO" && \
         cd "$GIT_DIR_NAME" && \
-        git checkout $REV
+        git checkout $REV && \
+        git submodule update --init
 ) || fail "Could not create a fresh clone from git"
 
 (

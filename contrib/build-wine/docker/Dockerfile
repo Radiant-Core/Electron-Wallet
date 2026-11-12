@@ -77,7 +77,6 @@ WORKDIR ${HOME}
 
 # wineboot needs to run after the user is added to /etc/passwd, otherwise it will assume the username is "wine"
 RUN wineboot && \
-    /tmp/winetricks --optout -q dotnet472 && \
     # Wait for the wine server to shutdown, needs to be done after wineboot to ensure the installation is good
     wineserver -w
 
@@ -86,40 +85,12 @@ RUN wineboot && \
 # default unless this variable is set.
 ENV DBUS_FATAL_WARNINGS=0
 
-RUN wget https://aka.ms/vs/16/release/installer -O /tmp/vs_installer.opc && \
-    # As of 2022-04-08 the checksum has changed and is not the same as in winetricks anymore
-    echo "ac9c4fbe7b2f777c6e46cb69d26d878f9119e3c32172d679bf70c0f003f4c790 /tmp/vs_installer.opc" | sha256sum -c - && \
-    7z x -oopc /tmp/vs_installer.opc && rm /tmp/vs_installer.opc && \
-    xvfb-run wine opc/Contents/vs_installer.exe install --quiet \
-        --channelId VisualStudio.16.Release --channelUri "https://aka.ms/vs/16/release/channel" \
-        --productId Microsoft.VisualStudio.Product.BuildTools \
-        --nocache --installWhileDownloading \
-        --add "Microsoft.VisualStudio.Workload.VCTools" \
-        # We could use --includeRecommended like winetricks does but to save time and space we only include what we actually need
-        --add "Microsoft.VisualStudio.Component.VC.Tools.x86.x64" \
-        --add "Microsoft.VisualStudio.Component.Windows10SDK.19041" && \
-    # vswhere.exe needs to be installed in this path so setuptools can detect the VS installation
-    mkdir "${WINEPREFIX}"/"drive_c/Program Files/Microsoft Visual Studio/Installer" && \
-    mv opc/Contents/vswhere.exe "${WINEPREFIX}"/"drive_c/Program Files/Microsoft Visual Studio/Installer" && \
-    rm -rf opc && wineserver -w
+# VS Build Tools / dotnet472 were removed: their only consumer was pyscard's
+# MSVC-compiled sdist, which is now filtered out of requirements-hw.txt.
+# All native builds in this image go through mingw-w64 instead.
 
-#RUN wine "${WINEPREFIX}"/"drive_c/windows/Microsoft.NET/Framework/v4.0.30319/ngen.exe" executequeueditems && \
-#    wineserver -w
-
-# Patch to make vcvarsall.bat work
-# "C:\Program Files\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" x86 && set
-# python -c "from setuptools import msvc; print(msvc.msvc14_get_vc_env('x86'))"
-# Caused by wrong delayed expansion in Wine, see https://bugs.winehq.org/show_bug.cgi?id=38289
-RUN sed -i -e 's/!result:~0,3!/10./g' "${WINEPREFIX}"/"drive_c/Program Files/Microsoft Visual Studio/2019/BuildTools/Common7/Tools/vsdevcmd/core/winsdk.bat"
-
-# Clean up some left overs only needed for the Visual Studio installer
+# Clean up packages only needed for the removed .NET / Visual Studio installer
 USER 0:0
 RUN apt-get remove cabextract xvfb -y && \
     apt-get autoremove -y
 USER ${USER_ID}:${GROUP_ID}
-
-# Build a wrapper for MSVC's link.exe that always passes the /Brepro flag to ensure builds are reproducible.
-COPY wrapper.cpp ${WINEPREFIX}/drive_c
-COPY wrapper_install.bat ${WINEPREFIX}/drive_c
-RUN wine C:/wrapper_install.bat && \
-    wineserver -w
